@@ -41,5 +41,5 @@ async function run() {
 
   await bot.login(config.token);
 }
- 
+
 run();
