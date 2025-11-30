@@ -28,7 +28,7 @@ bot.on("interactionCreate", (interaction) => {
 
 async function run() {
   // Import all controllers
-  const controllersPath = path.join(__dirname, "controllers", "**", "*.{ts,js}").replace(/\\/g, "/");
+  const controllersPath = path.join(__dirname, "controllers", "**", "*.js").replace(/\\/g, "/");
   const files = globSync(controllersPath);
 
   for (const file of files) {
