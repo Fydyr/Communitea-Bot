@@ -1,1 +1,0 @@
-{"version":3,"file":"WeatherController.d.ts","sourceRoot":"","sources":["../../src/controllers/WeatherController.ts"],"names":[],"mappings":"AAAA,OAAO,EAAgC,kBAAkB,EAAgB,MAAM,YAAY,CAAC;AAI5F,qBACa,iBAAiB;IAC5B,OAAO,CAAC,cAAc,CAAwB;IAGxC,OAAO,CAOX,IAAI,EAAE,MAAM,EACZ,WAAW,EAAE,kBAAkB,GAC9B,OAAO,CAAC,IAAI,CAAC;CAoDjB"}
