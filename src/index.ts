@@ -25,7 +25,7 @@ bot.once("ready", async () => {
   try {
     const channel = await bot.channels.fetch(config.statusChannelId);
     if (channel && "send" in channel) {
-      await channel.send("🟢 Bot démarré et prêt ! :)");
+      await channel.send("🟢 Bot démarré et prêt !");
     }
   } catch (error) {
     console.error("Erreur lors de l'envoi du message de démarrage:", error);
