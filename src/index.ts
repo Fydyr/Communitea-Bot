@@ -4,6 +4,9 @@ import { Client } from "discordx";
 import { config } from "./config";
 import path from "path";
 import { globSync } from "glob";
+import cron from "node-cron";
+import { AnecdoteService } from "./services/AnecdoteService";
+import { LoggerService } from "./services/LoggerService";
 
 export const bot = new Client({
   intents: [
@@ -23,13 +26,20 @@ bot.once("ready", async () => {
 
   // Envoyer un message dans le channel de status
   try {
-    const channel = await bot.channels.fetch(config.statusChannelId);
-    if (channel && "send" in channel) {
-      await channel.send("🟢 Bot démarré et prêt !");
-    }
+    await LoggerService.success(`Bot ${bot.user?.tag} démarré et prêt !`);
   } catch (error) {
     console.error("Erreur lors de l'envoi du message de démarrage:", error);
   }
+
+  // Planifier l'envoi quotidien d'anecdotes (tous les jours à 20h00)
+  cron.schedule("0 20 * * *", async () => {
+    await LoggerService.info("🕐 Envoi de l'anecdote quotidienne...");
+    await AnecdoteService.sendDailyAnecdote();
+  }, {
+    timezone: "Europe/Paris"
+  });
+
+  await LoggerService.info("📅 Planificateur d'anecdotes quotidiennes activé (20h00 chaque jour)");
 });
 
 bot.on("interactionCreate", (interaction) => {
