@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { LoggerService } from "./LoggerService";
 
 export class GeminiService {
   private static genAI: GoogleGenerativeAI | null = null;
@@ -16,9 +17,9 @@ export class GeminiService {
         `https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`
       );
       const data: any = await response.json();
-      console.log("Modèles disponibles:", data.models?.map((m: any) => m.name));
+      await LoggerService.info(`Modèles disponibles: ${data.models?.map((m: any) => m.name).join(", ")}`);
     } catch (error) {
-      console.error("Erreur lors de la récupération des modèles:", error);
+      await LoggerService.error(`Erreur lors de la récupération des modèles: ${error}`);
     }
   }
 
@@ -30,7 +31,7 @@ export class GeminiService {
       this.initialize();
 
       if (!this.genAI) {
-        console.log("GEMINI_API_KEY non configurée");
+        await LoggerService.warning("GEMINI_API_KEY non configurée");
         return null;
       }
 
@@ -93,14 +94,14 @@ Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
       // Parser la réponse JSON
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        console.error("Gemini n'a pas retourné de JSON valide:", text);
+        await LoggerService.error(`Gemini n'a pas retourné de JSON valide: ${text.substring(0, 200)}`);
         return null;
       }
 
       const anecdote = JSON.parse(jsonMatch[0]);
 
       if (!anecdote.title || !anecdote.paragraphs || anecdote.paragraphs.length < 3) {
-        console.error("Format de réponse Gemini invalide:", anecdote);
+        await LoggerService.error(`Format de réponse Gemini invalide: ${JSON.stringify(anecdote)}`);
         return null;
       }
 
@@ -116,7 +117,7 @@ Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
 
       return anecdote;
     } catch (error) {
-      console.error("Erreur lors de la génération avec Gemini:", error);
+      await LoggerService.error(`Erreur lors de la génération avec Gemini: ${error}`);
       return null;
     }
   }

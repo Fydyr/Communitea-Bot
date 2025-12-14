@@ -85,12 +85,12 @@ export class AnecdoteService {
 
   private static async fetchAnecdoteFromWeb(): Promise<Anecdote | null> {
     try {
-      console.log(`🤖 Tentative de génération d'anecdote via Gemini...`);
+      await LoggerService.info(`🤖 Tentative de génération d'anecdote via Gemini...`);
 
       // Essayer d'abord avec Gemini
       const geminiResult = await GeminiService.generateTechAnecdote();
       if (geminiResult) {
-        console.log(`✅ Anecdote générée avec succès via Gemini`);
+        await LoggerService.success(`Anecdote générée avec succès via Gemini`);
 
         // Ajouter "Généré par Gemini" comme première source
         const sources = [
@@ -109,10 +109,10 @@ export class AnecdoteService {
       }
 
       // Fallback sur Wikipedia si Gemini échoue
-      console.log(`⚠️ Gemini non disponible, fallback sur Wikipedia...`);
+      await LoggerService.warning(`Gemini non disponible, fallback sur Wikipedia...`);
       const anecdote = await this.fetchFromWikipedia();
       if (anecdote) {
-        console.log(`✅ Anecdote récupérée avec succès depuis Wikipedia`);
+        await LoggerService.success(`Anecdote récupérée avec succès depuis Wikipedia`);
         return anecdote;
       }
 
@@ -128,7 +128,7 @@ export class AnecdoteService {
       // Choisir un sujet tech aléatoire
       const randomTopic = this.TECH_TOPICS[Math.floor(Math.random() * this.TECH_TOPICS.length)];
 
-      console.log(`Tentative Wikipedia pour: ${randomTopic}`);
+      await LoggerService.info(`Tentative Wikipedia pour: ${randomTopic}`);
 
       // Utiliser Wikipedia FRANÇAIS avec un User-Agent valide
       const response = await axios.get(
@@ -141,10 +141,10 @@ export class AnecdoteService {
         }
       );
 
-      console.log("Réponse Wikipedia reçue:", response.status);
+      await LoggerService.info(`Réponse Wikipedia reçue: ${response.status}`);
 
       if (!response.data || !response.data.extract) {
-        console.log("Pas de données ou d'extrait dans la réponse");
+        await LoggerService.warning("Pas de données ou d'extrait dans la réponse Wikipedia");
         return null;
       }
 
@@ -195,7 +195,7 @@ export class AnecdoteService {
       };
     } catch (error) {
       // Erreur Wikipedia, retour null pour passer à la source suivante
-      console.error("Erreur Wikipedia complète:", error);
+      await LoggerService.error(`Erreur Wikipedia complète: ${error}`);
       return null;
     }
   }

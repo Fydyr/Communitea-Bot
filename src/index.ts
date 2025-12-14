@@ -22,13 +22,13 @@ export const bot = new Client({
 bot.once("clientReady", async () => {
   await bot.clearApplicationCommands();
   await bot.initApplicationCommands();
-  console.log(`Bot ${bot.user?.tag} is ready!`);
+  await LoggerService.success(`Bot ${bot.user?.tag} démarré et prêt !`);
 
   // Envoyer un message dans le channel de status
   try {
-    await LoggerService.success(`Bot ${bot.user?.tag} démarré et prêt !`);
+    await LoggerService.success(`Bot ${bot.user?.tag} initialisé avec succès !`);
   } catch (error) {
-    console.error("Erreur lors de l'envoi du message de démarrage:", error);
+    await LoggerService.error(`Erreur lors de l'envoi du message de démarrage: ${error}`);
   }
 
   // Planifier l'envoi quotidien d'anecdotes (tous les jours à 10h00)
@@ -55,19 +55,50 @@ bot.on("interactionCreate", (interaction) => {
 });
 
 async function run() {
-  // Import all controllers
-  const controllersPath = path.join(__dirname, "controllers", "**", "*.js").replace(/\\/g, "/");
-  const files = globSync(controllersPath);
+  try {
+    await LoggerService.info("🚀 Démarrage du bot Discord...");
 
-  for (const file of files) {
-    require(file);
+    // Import all controllers
+    const controllersPath = path.join(__dirname, "controllers", "**", "*.js").replace(/\\/g, "/");
+    const files = globSync(controllersPath);
+
+    await LoggerService.info(`📂 Chargement de ${files.length} contrôleur(s)...`);
+
+    for (const file of files) {
+      require(file);
+    }
+
+    if (!config.token) {
+      throw new Error("DISCORD_TOKEN is not set in .env file");
+    }
+
+    await bot.login(config.token);
+    await LoggerService.info("✅ Connexion au bot Discord établie");
+  } catch (error) {
+    await LoggerService.error(`❌ Erreur fatale lors du démarrage du bot: ${error}`);
+    process.exit(1);
   }
-
-  if (!config.token) {
-    throw new Error("DISCORD_TOKEN is not set in .env file");
-  }
-
-  await bot.login(config.token);
 }
+
+// Gestion globale des erreurs non capturées
+process.on("uncaughtException", async (error: Error) => {
+  await LoggerService.error(`💥 Exception non capturée: ${error.message}\nStack: ${error.stack}`);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", async (reason: any) => {
+  await LoggerService.error(`⚠️ Promesse rejetée non gérée: ${reason}`);
+});
+
+// Gestion de l'arrêt propre du bot
+process.on("SIGINT", async () => {
+  await LoggerService.warning("🛑 Arrêt du bot demandé (SIGINT)");
+  process.exit(0);
+});
+
+process.on("SIGTERM", async () => {
+  await LoggerService.warning("🛑 Arrêt du bot demandé (SIGTERM)");
+  process.exit(0);
+});
 
 run(); 

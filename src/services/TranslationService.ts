@@ -1,4 +1,5 @@
 import axios from "axios";
+import { LoggerService } from "./LoggerService";
 
 export class TranslationService {
   private static readonly MYMEMORY_API = "https://api.mymemory.translated.net/get";
@@ -36,7 +37,7 @@ export class TranslationService {
       return text;
     } catch (error) {
       // En cas d'erreur, retourner le texte original
-      console.error("Erreur de traduction:", error);
+      await LoggerService.error(`Erreur de traduction: ${error}`);
       return text;
     }
   }
@@ -51,7 +52,7 @@ export class TranslationService {
       );
       return translations;
     } catch (error) {
-      console.error("Erreur de traduction multiple:", error);
+      await LoggerService.error(`Erreur de traduction multiple: ${error}`);
       return texts;
     }
   }

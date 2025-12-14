@@ -1,10 +1,11 @@
 import { ArgsOf, GuardFunction } from "discordx";
+import { LoggerService } from "../services/LoggerService";
 
 export const LogInteraction: GuardFunction<ArgsOf<"interactionCreate">> = async (
   [interaction],
   _client,
   next
 ) => {
-  console.log(`[${new Date().toISOString()}] Interaction: ${interaction.id} by ${interaction.user.tag}`);
+  await LoggerService.info(`🔔 Interaction: ${interaction.id} par ${interaction.user.tag}`);
   await next();
 };

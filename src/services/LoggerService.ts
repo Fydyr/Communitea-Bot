@@ -38,7 +38,7 @@ export class LoggerService {
     const emoji = this.EMOJI_MAP[level];
     const formattedMessage = `${emoji} **[${level}]** ${message}`;
 
-    // Toujours afficher dans la console
+    // Toujours afficher dans la console (OBLIGATOIRE - ne pas remplacer)
     console.log(`[${timestamp}] ${formattedMessage}`);
 
     // Essayer d'envoyer via webhook en priorité
@@ -47,7 +47,8 @@ export class LoggerService {
         await this.sendViaWebhook(message, level, timestamp);
         return;
       } catch (error) {
-        console.error("Erreur lors de l'envoi via webhook, tentative via channel...", error);
+        // Console.error ici est OK car c'est une erreur interne du LoggerService
+        console.error(`[${timestamp}] ⚠️ Erreur webhook, fallback channel:`, error);
       }
     }
 
@@ -56,7 +57,8 @@ export class LoggerService {
       try {
         await this.sendViaChannel(formattedMessage);
       } catch (error) {
-        console.error("Erreur lors de l'envoi du log vers Discord:", error);
+        // Console.error ici est OK car c'est une erreur interne du LoggerService
+        console.error(`[${timestamp}] ⚠️ Erreur envoi Discord:`, error);
       }
     }
   }
