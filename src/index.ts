@@ -54,7 +54,7 @@ bot.once("clientReady", async () => {
     timezone: "Europe/Paris"
   });
 
-  await LoggerService.info("📅 Planificateur d'anecdotes quotidiennes activé (10h00, 15h00 et 20h00 chaque jour)");
+  await LoggerService.info("📅 Planificateur d'anecdotes quotidiennes activé (8h00 et 20h00 chaque jour)");
 
   // Nettoyage périodique des infractions expirées
   cron.schedule("0 * * * *", () => {
@@ -65,8 +65,17 @@ bot.once("clientReady", async () => {
   });
 });
 
-bot.on("interactionCreate", (interaction) => {
-  bot.executeInteraction(interaction);
+bot.on("interactionCreate", async (interaction) => {
+  try {
+    await bot.executeInteraction(interaction);
+  } catch (error: any) {
+    // Ignorer les erreurs d'interaction inconnue (timeout Discord)
+    if (error?.code === 10062 || error?.message?.includes("Unknown interaction")) {
+      await LoggerService.warning(`Interaction expirée ou invalide (probablement un timeout)`);
+      return;
+    }
+    await LoggerService.error(`Erreur lors de l'exécution de l'interaction: ${error}`);
+  }
 });
 
 bot.on("messageCreate", async (message) => {
@@ -107,6 +116,11 @@ process.on("uncaughtException", async (error: Error) => {
 });
 
 process.on("unhandledRejection", async (reason: any) => {
+  // Ignorer les erreurs d'interaction Discord connues
+  if (reason?.code === 10062 || reason?.message?.includes("Unknown interaction")) {
+    await LoggerService.warning(`Interaction Discord expirée (timeout) - Ignoré`);
+    return;
+  }
   await LoggerService.error(`⚠️ Promesse rejetée non gérée: ${reason}`);
 });
 

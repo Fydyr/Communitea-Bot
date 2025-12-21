@@ -1,4 +1,4 @@
-import { TextChannel, EmbedBuilder } from "discord.js";
+import { TextChannel, EmbedBuilder, NewsChannel } from "discord.js";
 import { bot } from "../index";
 import { config } from "../config";
 import axios from "axios";
@@ -54,12 +54,21 @@ export class AnecdoteService {
         return;
       }
 
+      await LoggerService.info(`🔍 Tentative de récupération du canal: ${config.anecdoteChannelId}`);
       const channel = await bot.channels.fetch(config.anecdoteChannelId);
 
-      if (!channel || !(channel instanceof TextChannel)) {
-        await LoggerService.error("Le canal d'anecdotes n'a pas été trouvé ou n'est pas un canal textuel");
+      if (!channel) {
+        await LoggerService.error(`Le canal d'anecdotes n'a pas été trouvé (ID: ${config.anecdoteChannelId})`);
         return;
       }
+
+      // Accepter les canaux textuels ET les canaux d'annonces
+      if (!(channel instanceof TextChannel) && !(channel instanceof NewsChannel)) {
+        await LoggerService.error(`Le canal trouvé n'est pas un canal textuel ou d'annonces (Type: ${channel.type}, ID: ${config.anecdoteChannelId})`);
+        return;
+      }
+
+      await LoggerService.info(`✅ Canal d'anecdotes trouvé: #${channel.name} (${channel instanceof NewsChannel ? 'Annonces' : 'Textuel'})`);
 
       // Récupérer une anecdote depuis le web
       const anecdote = await this.fetchAnecdoteFromWeb();
