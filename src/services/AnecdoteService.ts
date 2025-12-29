@@ -9,6 +9,7 @@ interface Anecdote {
   title: string;
   paragraphs: string[];
   sources: { name: string; url: string }[];
+  imageUrl?: string;
 }
 
 export class AnecdoteService {
@@ -214,6 +215,14 @@ export class AnecdoteService {
       .setTitle(anecdote.title)
       .setColor(0x5865F2) // Couleur bleu Discord
       .setTimestamp();
+
+    // Ajouter le logo du bot dans le header
+    if (bot.user) {
+      embed.setAuthor({
+        name: bot.user.username,
+        iconURL: bot.user.displayAvatarURL()
+      });
+    }
 
     // Ajouter les paragraphes comme description
     const description = anecdote.paragraphs.join("\n\n");
