@@ -7,8 +7,6 @@ import { globSync } from "glob";
 import cron from "node-cron";
 import { AnecdoteService } from "./services/AnecdoteService";
 import { LoggerService } from "./services/LoggerService";
-import AutoModerationService from "./services/AutoModerationService";
-import ModerationService from "./services/ModerationService";
 
 export const bot = new Client({
   intents: [
@@ -33,11 +31,6 @@ bot.once("clientReady", async () => {
     await LoggerService.error(`Erreur lors de l'envoi du message de démarrage: ${error}`);
   }
 
-  // Configurer les services de modération
-  ModerationService.setMaxWarnings(config.maxWarningsBeforeKick, config.maxWarningsBeforeBan);
-  AutoModerationService.setEnabled(config.autoModEnabled);
-  await LoggerService.info(`🛡️ Système de modération initialisé (AutoMod: ${config.autoModEnabled ? "activé" : "désactivé"})`);
-
   // Planifier l'envoi quotidien d'anecdotes (tous les jours à 8h00)
   cron.schedule("0 8 * * *", async () => {
     await LoggerService.info("🕐 Envoi de l'anecdote quotidienne (8h)...");
@@ -55,14 +48,6 @@ bot.once("clientReady", async () => {
   });
 
   await LoggerService.info("📅 Planificateur d'anecdotes quotidiennes activé (8h00 et 20h00 chaque jour)");
-
-  // Nettoyage périodique des infractions expirées
-  cron.schedule("0 * * * *", () => {
-    const cleared = ModerationService.clearExpiredInfractions();
-    if (cleared > 0) {
-      LoggerService.info(`🧹 ${cleared} infraction(s) expirée(s) nettoyée(s)`);
-    }
-  });
 });
 
 bot.on("interactionCreate", async (interaction) => {
@@ -76,11 +61,6 @@ bot.on("interactionCreate", async (interaction) => {
     }
     await LoggerService.error(`Erreur lors de l'exécution de l'interaction: ${error}`);
   }
-});
-
-bot.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
-  await AutoModerationService.checkMessage(message);
 });
 
 async function run() {
