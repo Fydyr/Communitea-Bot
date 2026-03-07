@@ -1,9 +1,9 @@
 import { TextChannel, EmbedBuilder, NewsChannel } from "discord.js";
 import { bot } from "../index";
-import { config } from "../config";
 import axios from "axios";
 import { LoggerService } from "./LoggerService";
 import { GeminiService } from "./GeminiService";
+import { prisma } from "../lib/prisma";
 
 interface Anecdote {
   title: string;
@@ -48,57 +48,212 @@ export class AnecdoteService {
     "Chiffrement", "VPN", "Tor_(réseau)"
   ];
 
-  public static async sendDailyAnecdote(): Promise<void> {
+  /**
+   * Envoie les anecdotes quotidiennes à tous les channels configurés
+   * Génère une anecdote différente par serveur
+   */
+  public static async sendDailyAnecdotes(): Promise<void> {
     try {
-      if (!config.anecdoteChannelId) {
-        await LoggerService.error("ANECDOTE_CHANNEL_ID n'est pas configuré dans .env");
+      // Récupérer tous les channels configurés
+      const anecdoteChannels = await prisma.anecdoteChannel.findMany();
+
+      if (anecdoteChannels.length === 0) {
+        await LoggerService.warning("Aucun channel d'anecdotes configuré");
         return;
       }
 
-      await LoggerService.info(`🔍 Tentative de récupération du canal: ${config.anecdoteChannelId}`);
-      const channel = await bot.channels.fetch(config.anecdoteChannelId);
+      // Regrouper les channels par serveur
+      const channelsByGuild = new Map<string, typeof anecdoteChannels>();
+      for (const channel of anecdoteChannels) {
+        const guildChannels = channelsByGuild.get(channel.guildId) || [];
+        guildChannels.push(channel);
+        channelsByGuild.set(channel.guildId, guildChannels);
+      }
 
-      if (!channel) {
-        await LoggerService.error(`Le canal d'anecdotes n'a pas été trouvé (ID: ${config.anecdoteChannelId})`);
+      await LoggerService.info(`📤 Envoi des anecdotes à ${channelsByGuild.size} serveur(s)...`);
+
+      // Générer et envoyer une anecdote différente par serveur
+      for (const [guildId, channels] of channelsByGuild) {
+        try {
+          const anecdote = await this.fetchAnecdoteFromWeb(guildId);
+
+          if (!anecdote) {
+            await LoggerService.error(`Impossible de récupérer une anecdote pour le serveur ${guildId}`);
+            continue;
+          }
+
+          // Sauvegarder le titre de l'anecdote pour ce serveur
+          await this.saveAnecdoteTitle(anecdote.title, guildId);
+
+          // Créer l'embed
+          const embed = this.createAnecdoteEmbed(anecdote);
+
+          // Envoyer à chaque channel du serveur
+          for (const channelConfig of channels) {
+            try {
+              const channel = await bot.channels.fetch(channelConfig.channelId);
+
+              if (!channel) {
+                await LoggerService.warning(`Channel ${channelConfig.channelId} introuvable, suppression de la config...`);
+                await prisma.anecdoteChannel.delete({ where: { id: channelConfig.id } });
+                continue;
+              }
+
+              if (!(channel instanceof TextChannel) && !(channel instanceof NewsChannel)) {
+                await LoggerService.warning(`Channel ${channelConfig.channelId} n'est pas un canal textuel ou d'annonces`);
+                continue;
+              }
+
+              const content = channelConfig.roleId ? `<@&${channelConfig.roleId}>` : undefined;
+
+              await channel.send({
+                content,
+                embeds: [embed]
+              });
+
+              await LoggerService.success(`Anecdote envoyée à #${channel.name} (${guildId})`);
+            } catch (error) {
+              await LoggerService.error(`Erreur lors de l'envoi au channel ${channelConfig.channelId}: ${error}`);
+            }
+          }
+
+          await LoggerService.success(`Anecdote quotidienne envoyée au serveur ${guildId}: ${anecdote.title}`);
+        } catch (error) {
+          await LoggerService.error(`Erreur lors de l'envoi des anecdotes au serveur ${guildId}: ${error}`);
+        }
+      }
+    } catch (error) {
+      await LoggerService.error(`Erreur lors de l'envoi des anecdotes quotidiennes: ${error}`);
+    }
+  }
+
+  /**
+   * Envoie une anecdote à tous les channels configurés d'un serveur spécifique
+   */
+  public static async sendAnecdotesToGuild(guildId: string): Promise<void> {
+    try {
+      const anecdoteChannels = await prisma.anecdoteChannel.findMany({
+        where: { guildId }
+      });
+
+      if (anecdoteChannels.length === 0) {
+        await LoggerService.warning(`Aucun channel d'anecdotes configuré pour le serveur ${guildId}`);
         return;
       }
 
-      // Accepter les canaux textuels ET les canaux d'annonces
-      if (!(channel instanceof TextChannel) && !(channel instanceof NewsChannel)) {
-        await LoggerService.error(`Le canal trouvé n'est pas un canal textuel ou d'annonces (Type: ${channel.type}, ID: ${config.anecdoteChannelId})`);
-        return;
-      }
-
-      await LoggerService.info(`✅ Canal d'anecdotes trouvé: #${channel.name} (${channel instanceof NewsChannel ? 'Annonces' : 'Textuel'})`);
-
-      // Récupérer une anecdote depuis le web
-      const anecdote = await this.fetchAnecdoteFromWeb();
+      const anecdote = await this.fetchAnecdoteFromWeb(guildId);
 
       if (!anecdote) {
         await LoggerService.error("Impossible de récupérer une anecdote depuis le web");
         return;
       }
 
-      // Créer l'embed
+      await this.saveAnecdoteTitle(anecdote.title, guildId);
       const embed = this.createAnecdoteEmbed(anecdote);
 
-      // Envoyer le message avec mention du rôle
-      await channel.send({
-        content: "<@&1419413598718918758>",
-        embeds: [embed]
-      });
-      await LoggerService.success(`Anecdote quotidienne envoyée : ${anecdote.title}`);
+      for (const channelConfig of anecdoteChannels) {
+        try {
+          const channel = await bot.channels.fetch(channelConfig.channelId);
+
+          if (!channel) {
+            await LoggerService.warning(`Channel ${channelConfig.channelId} introuvable`);
+            continue;
+          }
+
+          if (!(channel instanceof TextChannel) && !(channel instanceof NewsChannel)) {
+            continue;
+          }
+
+          const content = channelConfig.roleId ? `<@&${channelConfig.roleId}>` : undefined;
+
+          await channel.send({
+            content,
+            embeds: [embed]
+          });
+
+          await LoggerService.success(`Anecdote envoyée à #${channel.name}`);
+        } catch (error) {
+          await LoggerService.error(`Erreur lors de l'envoi au channel ${channelConfig.channelId}: ${error}`);
+        }
+      }
     } catch (error) {
-      await LoggerService.error(`Erreur lors de l'envoi de l'anecdote quotidienne: ${error}`);
+      await LoggerService.error(`Erreur lors de l'envoi des anecdotes au serveur ${guildId}: ${error}`);
     }
   }
 
-  private static async fetchAnecdoteFromWeb(): Promise<Anecdote | null> {
+  /**
+   * Envoie une anecdote à un channel spécifique (pour la commande manuelle)
+   */
+  public static async sendAnecdoteToChannel(channelId: string, guildId: string, roleId?: string | null): Promise<boolean> {
+    try {
+      const channel = await bot.channels.fetch(channelId);
+
+      if (!channel) {
+        await LoggerService.error(`Channel ${channelId} introuvable`);
+        return false;
+      }
+
+      if (!(channel instanceof TextChannel) && !(channel instanceof NewsChannel)) {
+        await LoggerService.error(`Channel ${channelId} n'est pas un canal textuel ou d'annonces`);
+        return false;
+      }
+
+      const anecdote = await this.fetchAnecdoteFromWeb(guildId);
+
+      if (!anecdote) {
+        await LoggerService.error("Impossible de récupérer une anecdote depuis le web");
+        return false;
+      }
+
+      // Sauvegarder le titre de l'anecdote pour ce serveur
+      await this.saveAnecdoteTitle(anecdote.title, guildId);
+
+      const embed = this.createAnecdoteEmbed(anecdote);
+      const content = roleId ? `<@&${roleId}>` : undefined;
+
+      await channel.send({
+        content,
+        embeds: [embed]
+      });
+
+      await LoggerService.success(`Anecdote envoyée manuellement à #${channel.name}`);
+      return true;
+    } catch (error) {
+      await LoggerService.error(`Erreur lors de l'envoi de l'anecdote: ${error}`);
+      return false;
+    }
+  }
+
+  /**
+   * Sauvegarde le titre d'une anecdote envoyée pour un serveur spécifique
+   */
+  private static async saveAnecdoteTitle(title: string, guildId: string): Promise<void> {
+    // Nettoyer le titre (enlever les emojis au début)
+    const cleanTitle = title.replace(/^[^\w\s]+\s*/, "").trim();
+
+    await prisma.sentAnecdote.create({
+      data: { title: cleanTitle, guildId }
+    });
+
+    await LoggerService.info(`📝 Titre sauvegardé pour le serveur ${guildId}: ${cleanTitle}`);
+  }
+
+  /**
+   * Récupère le nombre d'anecdotes déjà envoyées
+   */
+  public static async getSentAnecdotesCount(): Promise<number> {
+    return prisma.sentAnecdote.count();
+  }
+
+  private static async fetchAnecdoteFromWeb(guildId?: string): Promise<Anecdote | null> {
     try {
       await LoggerService.info(`🤖 Tentative de génération d'anecdote via Gemini...`);
 
-      // Essayer d'abord avec Gemini
-      const geminiResult = await GeminiService.generateTechAnecdote();
+      // Essayer d'abord avec Gemini (si guildId fourni, filtrera les anecdotes déjà envoyées)
+      const geminiResult = guildId
+        ? await GeminiService.generateTechAnecdote(guildId)
+        : null;
+
       if (geminiResult) {
         await LoggerService.success(`Anecdote générée avec succès via Gemini`);
 

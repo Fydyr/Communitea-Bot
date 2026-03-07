@@ -12,11 +12,14 @@ services:
     restart: unless-stopped
     environment:
       DISCORD_TOKEN: "${DISCORD_TOKEN}"
-      DISCORD_GUILD_ID: "${DISCORD_GUILD_ID}"
       STATUS_CHANNEL_ID: "${STATUS_CHANNEL_ID}"
-      ANECDOTE_CHANNEL_ID: "${ANECDOTE_CHANNEL_ID}"
       LOG_WEBHOOK_URL: "${LOG_WEBHOOK_URL}"
       GEMINI_API_KEY: "${GEMINI_API_KEY}"
+      DB_HOST: "${DB_HOST}"
+      DB_PORT: "${DB_PORT}"
+      DB_NAME: "${DB_NAME}"
+      DB_USER: "${DB_USER}"
+      DB_PASSWORD: "${DB_PASSWORD}"
       NODE_ENV: production
 
 networks:

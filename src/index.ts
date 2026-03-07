@@ -16,7 +16,6 @@ export const bot = new Client({
     IntentsBitField.Flags.MessageContent,
   ],
   silent: false,
-  botGuilds: config.guildId ? [config.guildId] : undefined,
 });
 
 bot.once("clientReady", async () => {
@@ -33,16 +32,16 @@ bot.once("clientReady", async () => {
 
   // Planifier l'envoi quotidien d'anecdotes (tous les jours à 8h00)
   cron.schedule("0 8 * * *", async () => {
-    await LoggerService.info("🕐 Envoi de l'anecdote quotidienne (8h)...");
-    await AnecdoteService.sendDailyAnecdote();
+    await LoggerService.info("🕐 Envoi des anecdotes quotidiennes (8h)...");
+    await AnecdoteService.sendDailyAnecdotes();
   }, {
     timezone: "Europe/Paris"
   });
 
   // Planifier l'envoi quotidien d'anecdotes (tous les jours à 20h00)
   cron.schedule("0 20 * * *", async () => {
-    await LoggerService.info("🕐 Envoi de l'anecdote quotidienne (20h)...");
-    await AnecdoteService.sendDailyAnecdote();
+    await LoggerService.info("🕐 Envoi des anecdotes quotidiennes (20h)...");
+    await AnecdoteService.sendDailyAnecdotes();
   }, {
     timezone: "Europe/Paris"
   });

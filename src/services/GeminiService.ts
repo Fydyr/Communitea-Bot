@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { LoggerService } from "./LoggerService";
+import { prisma } from "../lib/prisma";
 
 export class GeminiService {
   private static genAI: GoogleGenerativeAI | null = null;
@@ -10,23 +11,23 @@ export class GeminiService {
     }
   }
 
-  private static async listAvailableModels() {
-    try {
-      if (!this.genAI) return;
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`
-      );
-      const data: any = await response.json();
-      await LoggerService.info(`Modèles disponibles: ${data.models?.map((m: any) => m.name).join(", ")}`);
-    } catch (error) {
-      await LoggerService.error(`Erreur lors de la récupération des modèles: ${error}`);
-    }
+  /**
+   * Récupère tous les titres des anecdotes déjà envoyées pour un serveur spécifique
+   */
+  private static async getSentAnecdoteTitles(guildId: string): Promise<string[]> {
+    const sentAnecdotes = await prisma.sentAnecdote.findMany({
+      where: { guildId },
+      select: { title: true },
+      orderBy: { sentAt: "desc" },
+    });
+    return sentAnecdotes.map((a) => a.title);
   }
 
   /**
    * Génère une anecdote informatique intéressante via Gemini
+   * @param guildId L'identifiant du serveur pour filtrer les anecdotes déjà envoyées
    */
-  public static async generateTechAnecdote(): Promise<{ title: string; paragraphs: string[]; sources: { name: string; url: string }[] } | null> {
+  public static async generateTechAnecdote(guildId: string): Promise<{ title: string; paragraphs: string[]; sources: { name: string; url: string }[] } | null> {
     try {
       this.initialize();
 
@@ -35,8 +36,11 @@ export class GeminiService {
         return null;
       }
 
-      // Liste des modèles pour debug
-      // await this.listAvailableModels();
+      // Récupérer les titres déjà envoyés pour ce serveur
+      const sentTitles = await this.getSentAnecdoteTitles(guildId);
+      const titlesContext = sentTitles.length > 0
+        ? `\n\n⛔ TITRES INTERDITS - Ces anecdotes ont DÉJÀ été envoyées sur ce serveur. Tu ne dois ABSOLUMENT PAS les répéter, ni parler des mêmes sujets, ni reformuler ces anecdotes :\n${sentTitles.map((t) => `- "${t}"`).join("\n")}\n\nChoisis un sujet COMPLÈTEMENT DIFFÉRENT de ceux listés ci-dessus.`
+        : "";
 
       // Utiliser gemini-2.5-flash qui a un meilleur quota gratuit
       const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
@@ -70,6 +74,7 @@ Sujets suggérés (choisis-en un au hasard, varie les thèmes) :
 Tu peux aussi parler occasionnellement de sujets récents (2023-2025) mais sans en faire une priorité :
 - Actualité technologique récente si elle est vraiment marquante
 - Nouvelles innovations significatives
+${titlesContext}
 
 Format de réponse (très important, respecte exactement ce format JSON) :
 {
