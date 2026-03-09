@@ -358,13 +358,26 @@ export class AnecdoteService {
     }
   }
 
-  private static createAnecdoteEmbed(anecdote: Anecdote): EmbedBuilder {
-    const embed = new EmbedBuilder()
-      .setTitle(anecdote.title)
-      .setColor(0x5865F2) // Couleur bleu Discord
-      .setTimestamp();
+  private static isValidUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
 
-    // Ajouter le logo du bot dans le header
+  private static createAnecdoteEmbed(anecdote: Anecdote): EmbedBuilder {
+    // Limites Discord : title 256, description 4096, footer 2048, field value 1024
+    const title = anecdote.title.slice(0, 256);
+    const description = anecdote.paragraphs.join("\n\n").slice(0, 4096);
+
+    const embed = new EmbedBuilder()
+      .setTitle(title)
+      .setColor(0x5865F2)
+      .setTimestamp()
+      .setDescription(description);
+
     if (bot.user) {
       embed.setAuthor({
         name: bot.user.username,
@@ -372,26 +385,20 @@ export class AnecdoteService {
       });
     }
 
-    // Ajouter les paragraphes comme description
-    const description = anecdote.paragraphs.join("\n\n");
-    embed.setDescription(description);
+    // Filtrer les sources avec URLs valides (http/https uniquement)
+    const safeSources = anecdote.sources.filter(
+      (s) => s.name && s.url && this.isValidUrl(s.url)
+    );
 
-    // Ajouter les sources dans le footer
-    const sourcesText = anecdote.sources
-      .map((source) => `${source.name}`)
-      .join(" | ");
-    embed.setFooter({ text: `Sources: ${sourcesText}` });
+    if (safeSources.length > 0) {
+      const footerText = `Sources: ${safeSources.map((s) => s.name).join(" | ")}`.slice(0, 2048);
+      embed.setFooter({ text: footerText });
 
-    // Ajouter les liens des sources comme champs si on veut les rendre cliquables
-    if (anecdote.sources.length > 0) {
-      const sourcesLinks = anecdote.sources
-        .map((source) => `[${source.name}](${source.url})`)
-        .join(" • ");
-      embed.addFields({
-        name: "🔗 Sources",
-        value: sourcesLinks,
-        inline: false
-      });
+      const sourcesLinks = safeSources
+        .map((s) => `[${s.name}](${s.url})`)
+        .join(" • ")
+        .slice(0, 1024);
+      embed.addFields({ name: "🔗 Sources", value: sourcesLinks, inline: false });
     }
 
     return embed;

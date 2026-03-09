@@ -108,24 +108,54 @@ Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
         return null;
       }
 
-      const anecdote = JSON.parse(jsonMatch[0]);
-
-      if (!anecdote.title || !anecdote.paragraphs || anecdote.paragraphs.length < 3) {
-        await LoggerService.error(`Format de réponse Gemini invalide: ${JSON.stringify(anecdote)}`);
+      let raw: any;
+      try {
+        raw = JSON.parse(jsonMatch[0]);
+      } catch {
+        await LoggerService.error("Gemini a retourné un JSON malformé");
         return null;
       }
 
-      // Si Gemini n'a pas fourni de sources, ajouter une source par défaut
-      if (!anecdote.sources || anecdote.sources.length === 0) {
-        anecdote.sources = [
-          {
-            name: "Généré par IA (Gemini)",
-            url: "https://ai.google.dev/gemini-api"
-          }
-        ];
+      // Valider le titre
+      if (!raw.title || typeof raw.title !== "string" || raw.title.trim().length === 0) {
+        await LoggerService.error("Format de réponse Gemini invalide: titre manquant ou invalide");
+        return null;
       }
 
-      return anecdote;
+      // Valider les paragraphes
+      if (!Array.isArray(raw.paragraphs) || raw.paragraphs.length < 3) {
+        await LoggerService.error("Format de réponse Gemini invalide: paragraphes manquants");
+        return null;
+      }
+
+      const validParagraphs = raw.paragraphs
+        .filter((p: unknown) => typeof p === "string" && p.trim().length > 0)
+        .slice(0, 3);
+
+      if (validParagraphs.length < 3) {
+        await LoggerService.error("Format de réponse Gemini invalide: paragraphes insuffisants");
+        return null;
+      }
+
+      // Valider et filtrer les sources (URLs http/https uniquement)
+      const rawSources = Array.isArray(raw.sources) ? raw.sources : [];
+      const validSources = rawSources.filter((s: unknown) => {
+        if (!s || typeof (s as any).name !== "string" || typeof (s as any).url !== "string") return false;
+        try {
+          const url = new URL((s as any).url);
+          return url.protocol === "http:" || url.protocol === "https:";
+        } catch {
+          return false;
+        }
+      }).slice(0, 5);
+
+      return {
+        title: raw.title.trim(),
+        paragraphs: validParagraphs,
+        sources: validSources.length > 0 ? validSources : [
+          { name: "Généré par IA (Gemini)", url: "https://ai.google.dev/gemini-api" }
+        ],
+      };
     } catch (error) {
       await LoggerService.error(`Erreur lors de la génération avec Gemini: ${error}`);
       return null;

@@ -12,15 +12,33 @@ const encodedPassword = encodeURIComponent(dbPassword);
 
 process.env.DATABASE_URL = `postgresql://${dbUser}:${encodedPassword}@${dbHost}:${dbPort}/${dbName}?schema=public`;
 
-// Lancer la commande Prisma passée en argument
-const { execSync } = require("child_process");
-const args = process.argv.slice(2).join(" ");
+// Whitelist des commandes Prisma autorisées
+const ALLOWED_COMMANDS = [
+  ["generate"],
+  ["db", "push"],
+  ["db", "pull"],
+  ["migrate", "dev"],
+  ["migrate", "deploy"],
+  ["migrate", "reset"],
+  ["studio"],
+];
 
-try {
-  execSync(`npx prisma ${args}`, {
-    stdio: "inherit",
-    env: process.env
-  });
-} catch (error) {
-  process.exit(error.status || 1);
+const args = process.argv.slice(2);
+const isAllowed = ALLOWED_COMMANDS.some(
+  (cmd) => cmd.length === args.length && cmd.every((part, i) => part === args[i])
+);
+
+if (!isAllowed) {
+  console.error(`Commande Prisma non autorisée: prisma ${args.join(" ")}`);
+  process.exit(1);
 }
+
+// Lancer la commande Prisma avec les arguments validés
+const { spawnSync } = require("child_process");
+const result = spawnSync("npx", ["prisma", ...args], {
+  stdio: "inherit",
+  env: process.env,
+  shell: process.platform === "win32",
+});
+
+process.exit(result.status ?? 1);
