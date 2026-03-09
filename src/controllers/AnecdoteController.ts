@@ -174,6 +174,11 @@ export class AnecdoteController {
   async sendAnecdote(interaction: CommandInteraction): Promise<void> {
     await interaction.deferReply({ flags: 64 });
 
+    if (interaction.user.id !== process.env.OWNER_ID) {
+      await interaction.editReply("❌ Tu n'as pas la permission d'utiliser cette commande.");
+      return;
+    }
+
     try {
       if (!interaction.guildId) {
         await interaction.editReply("❌ Cette commande doit être utilisée dans un serveur.");
