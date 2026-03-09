@@ -38,4 +38,4 @@ RUN npm prune --production
 # EXPOSE 3000
 
 # Lancer l'application compilée
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npm run prisma:migrate:prod && npm start"]
