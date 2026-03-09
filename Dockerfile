@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
 # Installer git et openssh-client pour pouvoir cloner des repos privés si nécessaire
-RUN apk add --no-cache git openssh-client bash
+RUN apk add --no-cache git openssh-client bash openssl
 
 WORKDIR /usr/src/app
 
