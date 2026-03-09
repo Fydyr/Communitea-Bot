@@ -186,20 +186,14 @@ export class AnecdoteController {
         return;
       }
 
-      // Récupérer les channels configurés pour ce serveur
-      const configuredChannels = await prisma.anecdoteChannel.findMany({
-        where: { guildId: interaction.guildId }
-      });
+      const sentChannelIds = await AnecdoteService.sendAnecdotesToGuild(interaction.guildId);
 
-      if (configuredChannels.length === 0) {
+      if (sentChannelIds.length === 0) {
         await interaction.editReply("❌ Aucun channel n'est configuré pour les anecdotes sur ce serveur.\nUtilise `/anecdote-setup` pour en configurer un.");
         return;
       }
 
-      // Envoyer l'anecdote dans tous les channels configurés du serveur
-      await AnecdoteService.sendAnecdotesToGuild(interaction.guildId);
-
-      const channelMentions = configuredChannels.map((c: { channelId: string }) => `<#${c.channelId}>`).join(", ");
+      const channelMentions = sentChannelIds.map((id) => `<#${id}>`).join(", ");
       await interaction.editReply(`✅ Anecdote envoyée dans : ${channelMentions}`);
     } catch (error) {
       await LoggerService.error(`Erreur lors de l'envoi manuel de l'anecdote: ${error}`);

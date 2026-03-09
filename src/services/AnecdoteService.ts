@@ -125,7 +125,7 @@ export class AnecdoteService {
   /**
    * Envoie une anecdote à tous les channels configurés d'un serveur spécifique
    */
-  public static async sendAnecdotesToGuild(guildId: string): Promise<void> {
+  public static async sendAnecdotesToGuild(guildId: string): Promise<string[]> {
     try {
       const anecdoteChannels = await prisma.anecdoteChannel.findMany({
         where: { guildId }
@@ -133,14 +133,14 @@ export class AnecdoteService {
 
       if (anecdoteChannels.length === 0) {
         await LoggerService.warning(`Aucun channel d'anecdotes configuré pour le serveur ${guildId}`);
-        return;
+        return [];
       }
 
       const anecdote = await this.fetchAnecdoteFromWeb(guildId);
 
       if (!anecdote) {
         await LoggerService.error("Impossible de récupérer une anecdote depuis le web");
-        return;
+        return [];
       }
 
       await this.saveAnecdoteTitle(anecdote.title, guildId);
@@ -166,8 +166,11 @@ export class AnecdoteService {
           await LoggerService.error(`Erreur lors de l'envoi au channel ${channelConfig.channelId}: ${error}`);
         }
       }));
+
+      return anecdoteChannels.map((c) => c.channelId);
     } catch (error) {
       await LoggerService.error(`Erreur lors de l'envoi des anecdotes au serveur ${guildId}: ${error}`);
+      return [];
     }
   }
 

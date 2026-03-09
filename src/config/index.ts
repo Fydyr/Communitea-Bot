@@ -7,4 +7,5 @@ export const config = {
   statusChannelId: process.env.STATUS_CHANNEL_ID || "",
   logWebhookUrl: process.env.LOG_WEBHOOK_URL || "",
   ownerId: process.env.OWNER_ID || "",
+  geminiApiKey: process.env.GEMINI_API_KEY || "",
 };

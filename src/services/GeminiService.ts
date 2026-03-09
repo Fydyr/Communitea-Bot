@@ -1,13 +1,14 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { LoggerService } from "./LoggerService";
 import { prisma } from "../lib/prisma";
+import { config } from "../config";
 
 export class GeminiService {
   private static genAI: GoogleGenerativeAI | null = null;
 
   private static initialize() {
-    if (!this.genAI && process.env.GEMINI_API_KEY) {
-      this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    if (!this.genAI && config.geminiApiKey) {
+      this.genAI = new GoogleGenerativeAI(config.geminiApiKey);
     }
   }
 

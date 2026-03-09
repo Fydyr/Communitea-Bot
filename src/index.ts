@@ -23,28 +23,12 @@ bot.once("clientReady", async () => {
   await bot.initApplicationCommands();
   await LoggerService.success(`Bot ${bot.user?.tag} démarré et prêt !`);
 
-  // Envoyer un message dans le channel de status
-  try {
-    await LoggerService.success(`Bot ${bot.user?.tag} initialisé avec succès !`);
-  } catch (error) {
-    await LoggerService.error(`Erreur lors de l'envoi du message de démarrage: ${error}`);
+  for (const hour of [8, 20]) {
+    cron.schedule(`0 ${hour} * * *`, async () => {
+      await LoggerService.info(`🕐 Envoi des anecdotes quotidiennes (${hour}h)...`);
+      await AnecdoteService.sendDailyAnecdotes();
+    }, { timezone: "Europe/Paris" });
   }
-
-  // Planifier l'envoi quotidien d'anecdotes (tous les jours à 8h00)
-  cron.schedule("0 8 * * *", async () => {
-    await LoggerService.info("🕐 Envoi des anecdotes quotidiennes (8h)...");
-    await AnecdoteService.sendDailyAnecdotes();
-  }, {
-    timezone: "Europe/Paris"
-  });
-
-  // Planifier l'envoi quotidien d'anecdotes (tous les jours à 20h00)
-  cron.schedule("0 20 * * *", async () => {
-    await LoggerService.info("🕐 Envoi des anecdotes quotidiennes (20h)...");
-    await AnecdoteService.sendDailyAnecdotes();
-  }, {
-    timezone: "Europe/Paris"
-  });
 
   await LoggerService.info("📅 Planificateur d'anecdotes quotidiennes activé (8h00 et 20h00 chaque jour)");
 });
