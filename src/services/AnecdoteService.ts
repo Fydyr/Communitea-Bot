@@ -88,34 +88,29 @@ export class AnecdoteService {
           // Créer l'embed
           const embed = this.createAnecdoteEmbed(anecdote);
 
-          // Envoyer à chaque channel du serveur
-          for (const channelConfig of channels) {
+          // Envoyer à chaque channel du serveur (en parallèle)
+          await Promise.allSettled(channels.map(async (channelConfig) => {
             try {
               const channel = await bot.channels.fetch(channelConfig.channelId);
 
               if (!channel) {
                 await LoggerService.warning(`Channel ${channelConfig.channelId} introuvable, suppression de la config...`);
                 await prisma.anecdoteChannel.delete({ where: { id: channelConfig.id } });
-                continue;
+                return;
               }
 
               if (!(channel instanceof TextChannel) && !(channel instanceof NewsChannel)) {
                 await LoggerService.warning(`Channel ${channelConfig.channelId} n'est pas un canal textuel ou d'annonces`);
-                continue;
+                return;
               }
 
               const content = channelConfig.roleId ? `<@&${channelConfig.roleId}>` : undefined;
-
-              await channel.send({
-                content,
-                embeds: [embed]
-              });
-
+              await channel.send({ content, embeds: [embed] });
               await LoggerService.success(`Anecdote envoyée à #${channel.name} (${guildId})`);
             } catch (error) {
               await LoggerService.error(`Erreur lors de l'envoi au channel ${channelConfig.channelId}: ${error}`);
             }
-          }
+          }));
 
           await LoggerService.success(`Anecdote quotidienne envoyée au serveur ${guildId}: ${anecdote.title}`);
         } catch (error) {
@@ -151,31 +146,26 @@ export class AnecdoteService {
       await this.saveAnecdoteTitle(anecdote.title, guildId);
       const embed = this.createAnecdoteEmbed(anecdote);
 
-      for (const channelConfig of anecdoteChannels) {
+      await Promise.allSettled(anecdoteChannels.map(async (channelConfig) => {
         try {
           const channel = await bot.channels.fetch(channelConfig.channelId);
 
           if (!channel) {
             await LoggerService.warning(`Channel ${channelConfig.channelId} introuvable`);
-            continue;
+            return;
           }
 
           if (!(channel instanceof TextChannel) && !(channel instanceof NewsChannel)) {
-            continue;
+            return;
           }
 
           const content = channelConfig.roleId ? `<@&${channelConfig.roleId}>` : undefined;
-
-          await channel.send({
-            content,
-            embeds: [embed]
-          });
-
+          await channel.send({ content, embeds: [embed] });
           await LoggerService.success(`Anecdote envoyée à #${channel.name}`);
         } catch (error) {
           await LoggerService.error(`Erreur lors de l'envoi au channel ${channelConfig.channelId}: ${error}`);
         }
-      }
+      }));
     } catch (error) {
       await LoggerService.error(`Erreur lors de l'envoi des anecdotes au serveur ${guildId}: ${error}`);
     }

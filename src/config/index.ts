@@ -6,4 +6,5 @@ export const config = {
   token: process.env.DISCORD_TOKEN || "",
   statusChannelId: process.env.STATUS_CHANNEL_ID || "",
   logWebhookUrl: process.env.LOG_WEBHOOK_URL || "",
+  ownerId: process.env.OWNER_ID || "",
 };

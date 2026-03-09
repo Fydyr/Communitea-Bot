@@ -12,6 +12,7 @@ import {
 import { AnecdoteService } from "../services/AnecdoteService";
 import { LoggerService } from "../services/LoggerService";
 import { prisma } from "../lib/prisma";
+import { config } from "../config";
 
 @Discord()
 export class AnecdoteController {
@@ -172,12 +173,12 @@ export class AnecdoteController {
     defaultMemberPermissions: PermissionFlagsBits.Administrator
   })
   async sendAnecdote(interaction: CommandInteraction): Promise<void> {
-    await interaction.deferReply({ flags: 64 });
-
-    if (interaction.user.id !== process.env.OWNER_ID) {
-      await interaction.editReply("❌ Tu n'as pas la permission d'utiliser cette commande.");
+    if (interaction.user.id !== config.ownerId) {
+      await interaction.reply({ content: "❌ Tu n'as pas la permission d'utiliser cette commande.", flags: 64 });
       return;
     }
+
+    await interaction.deferReply({ flags: 64 });
 
     try {
       if (!interaction.guildId) {
