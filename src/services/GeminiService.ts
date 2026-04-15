@@ -59,13 +59,14 @@ export class GeminiService {
         ? `\n\n⛔ TITRES INTERDITS - Ces anecdotes ont DÉJÀ été envoyées sur ce serveur. Tu ne dois ABSOLUMENT PAS les répéter, ni parler des mêmes sujets, ni reformuler ces anecdotes :\n${sentTitles.map((t) => `- "${t}"`).join("\n")}\n\nChoisis un sujet COMPLÈTEMENT DIFFÉRENT de ceux listés ci-dessus.`
         : "";
 
-      // Utiliser gemini-2.5-flash avec réponse JSON forcée
-      const model = this.genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        generationConfig: {
-          responseMimeType: "application/json",
-        },
-      });
+      // Liste de modèles à essayer dans l'ordre (fallback si l'un est surchargé)
+      const modelNames = [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash",
+      ];
 
       const prompt = `Génère une anecdote fascinante et peu connue sur l'informatique, la technologie ou l'histoire du numérique.
 
@@ -118,81 +119,103 @@ IMPORTANT : Fournis toujours au moins une source vérifiable avec une URL réell
 
 Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
 
-      const MAX_RETRIES = 3;
+      const MAX_RETRIES_PER_MODEL = 2;
 
-      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-          const result = await model.generateContent(prompt);
-          const response = result.response;
-          const text = response.text();
+      for (const modelName of modelNames) {
+        const model = this.genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: {
+            responseMimeType: "application/json",
+          },
+        });
 
-          // Parser la réponse JSON
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (!jsonMatch) {
-            await LoggerService.warning(`Gemini tentative ${attempt}/${MAX_RETRIES}: pas de JSON valide`);
-            continue;
-          }
-
-          let raw: any;
+        for (let attempt = 1; attempt <= MAX_RETRIES_PER_MODEL; attempt++) {
           try {
-            raw = JSON.parse(jsonMatch[0]);
-          } catch {
-            // Tenter de réparer le JSON malformé
-            try {
-              raw = JSON.parse(this.repairJson(jsonMatch[0]));
-              await LoggerService.info(`JSON réparé avec succès (tentative ${attempt})`);
-            } catch {
-              await LoggerService.warning(`Gemini tentative ${attempt}/${MAX_RETRIES}: JSON malformé impossible à réparer`);
+            const result = await model.generateContent(prompt);
+            const response = result.response;
+            const text = response.text();
+
+            // Parser la réponse JSON
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+              await LoggerService.warning(`Gemini [${modelName}] tentative ${attempt}: pas de JSON valide`);
               continue;
             }
-          }
 
-          // Valider le titre
-          if (!raw.title || typeof raw.title !== "string" || raw.title.trim().length === 0) {
-            await LoggerService.warning(`Gemini tentative ${attempt}/${MAX_RETRIES}: titre manquant ou invalide`);
-            continue;
-          }
-
-          // Valider les paragraphes
-          if (!Array.isArray(raw.paragraphs) || raw.paragraphs.length < 3) {
-            await LoggerService.warning(`Gemini tentative ${attempt}/${MAX_RETRIES}: paragraphes manquants`);
-            continue;
-          }
-
-          const validParagraphs = raw.paragraphs
-            .filter((p: unknown) => typeof p === "string" && p.trim().length > 0)
-            .slice(0, 3);
-
-          if (validParagraphs.length < 3) {
-            await LoggerService.warning(`Gemini tentative ${attempt}/${MAX_RETRIES}: paragraphes insuffisants`);
-            continue;
-          }
-
-          // Valider et filtrer les sources (URLs http/https uniquement)
-          const rawSources = Array.isArray(raw.sources) ? raw.sources : [];
-          const validSources = rawSources.filter((s: unknown) => {
-            if (!s || typeof (s as any).name !== "string" || typeof (s as any).url !== "string") return false;
+            let raw: any;
             try {
-              const url = new URL((s as any).url);
-              return url.protocol === "http:" || url.protocol === "https:";
+              raw = JSON.parse(jsonMatch[0]);
             } catch {
-              return false;
+              try {
+                raw = JSON.parse(this.repairJson(jsonMatch[0]));
+                await LoggerService.info(`JSON réparé avec succès [${modelName}] tentative ${attempt}`);
+              } catch {
+                await LoggerService.warning(`Gemini [${modelName}] tentative ${attempt}: JSON malformé impossible à réparer`);
+                continue;
+              }
             }
-          }).slice(0, 5);
 
-          return {
-            title: raw.title.trim(),
-            paragraphs: validParagraphs,
-            sources: validSources.length > 0 ? validSources : [
-              { name: "Généré par IA (Gemini)", url: "https://ai.google.dev/gemini-api" }
-            ],
-          };
-        } catch (error) {
-          await LoggerService.warning(`Gemini tentative ${attempt}/${MAX_RETRIES} échouée: ${error}`);
+            if (!raw.title || typeof raw.title !== "string" || raw.title.trim().length === 0) {
+              await LoggerService.warning(`Gemini [${modelName}] tentative ${attempt}: titre manquant`);
+              continue;
+            }
+
+            if (!Array.isArray(raw.paragraphs) || raw.paragraphs.length < 3) {
+              await LoggerService.warning(`Gemini [${modelName}] tentative ${attempt}: paragraphes manquants`);
+              continue;
+            }
+
+            const validParagraphs = raw.paragraphs
+              .filter((p: unknown) => typeof p === "string" && p.trim().length > 0)
+              .slice(0, 3);
+
+            if (validParagraphs.length < 3) {
+              await LoggerService.warning(`Gemini [${modelName}] tentative ${attempt}: paragraphes insuffisants`);
+              continue;
+            }
+
+            const rawSources = Array.isArray(raw.sources) ? raw.sources : [];
+            const validSources = rawSources.filter((s: unknown) => {
+              if (!s || typeof (s as any).name !== "string" || typeof (s as any).url !== "string") return false;
+              try {
+                const url = new URL((s as any).url);
+                return url.protocol === "http:" || url.protocol === "https:";
+              } catch {
+                return false;
+              }
+            }).slice(0, 5);
+
+            if (modelName !== modelNames[0]) {
+              await LoggerService.info(`Anecdote générée via modèle de fallback [${modelName}]`);
+            }
+
+            return {
+              title: raw.title.trim(),
+              paragraphs: validParagraphs,
+              sources: validSources.length > 0 ? validSources : [
+                { name: "Généré par IA (Gemini)", url: "https://ai.google.dev/gemini-api" }
+              ],
+            };
+          } catch (error) {
+            const errStr = String(error);
+            const isOverloaded = /\b(503|429|overload|unavailable|quota|rate.?limit)/i.test(errStr);
+
+            await LoggerService.warning(`Gemini [${modelName}] tentative ${attempt} échouée: ${errStr.substring(0, 200)}`);
+
+            if (isOverloaded) {
+              // Surcharge : passer directement au modèle suivant
+              break;
+            }
+
+            // Backoff exponentiel avant retry sur le même modèle
+            if (attempt < MAX_RETRIES_PER_MODEL) {
+              await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+            }
+          }
         }
       }
 
-      await LoggerService.error(`Gemini: échec après ${MAX_RETRIES} tentatives`);
+      await LoggerService.error(`Gemini: tous les modèles de fallback ont échoué`);
       return null;
     } catch (error) {
       await LoggerService.error(`Erreur lors de la génération avec Gemini: ${error}`);
