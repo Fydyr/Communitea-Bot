@@ -2,9 +2,19 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { LoggerService } from "./LoggerService";
 import { prisma } from "../lib/prisma";
 import { config } from "../config";
+import { DEFAULT_LANGUAGE, type Language } from "./GuildSettingsService";
 
 export class GeminiService {
   private static genAI: GoogleGenerativeAI | null = null;
+
+  /** Nom de la langue cible, pour la directive de rédaction envoyée à Gemini. */
+  private static readonly LANGUAGE_NAMES: Record<Language, string> = {
+    fr: "français",
+    en: "anglais (English)",
+    es: "espagnol (español)",
+    de: "allemand (Deutsch)",
+    it: "italien (italiano)",
+  };
 
   private static initialize() {
     if (!this.genAI && config.geminiApiKey) {
@@ -44,7 +54,7 @@ export class GeminiService {
    * Génère une anecdote informatique intéressante via Gemini
    * @param guildId L'identifiant du serveur pour filtrer les anecdotes déjà envoyées
    */
-  public static async generateTechAnecdote(guildId: string): Promise<{ title: string; paragraphs: string[]; sources: { name: string; url: string }[] } | null> {
+  public static async generateTechAnecdote(guildId: string, language: Language = DEFAULT_LANGUAGE): Promise<{ title: string; paragraphs: string[]; sources: { name: string; url: string }[] } | null> {
     try {
       this.initialize();
 
@@ -52,6 +62,9 @@ export class GeminiService {
         await LoggerService.warning("GEMINI_API_KEY non configurée");
         return null;
       }
+
+      const languageName = this.LANGUAGE_NAMES[language] ?? this.LANGUAGE_NAMES[DEFAULT_LANGUAGE];
+      const languageDirective = `\n\n🌍 LANGUE OBLIGATOIRE : rédige le titre ET tous les paragraphes en ${languageName}. Les sources peuvent rester dans leur langue d'origine.`;
 
       // Récupérer les titres déjà envoyés pour ce serveur
       const sentTitles = await this.getSentAnecdoteTitles(guildId);
@@ -116,6 +129,7 @@ Format de réponse (très important, respecte exactement ce format JSON) :
 }
 
 IMPORTANT : Fournis toujours au moins une source vérifiable avec une URL réelle où l'utilisateur peut vérifier l'anecdote.
+${languageDirective}
 
 Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
 

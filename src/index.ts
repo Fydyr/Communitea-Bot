@@ -23,14 +23,14 @@ bot.once("clientReady", async () => {
   await bot.initApplicationCommands();
   await LoggerService.success(`Bot ${bot.user?.tag} démarré et prêt !`);
 
-  for (const hour of [8, 20]) {
-    cron.schedule(`0 ${hour} * * *`, async () => {
-      await LoggerService.info(`🕐 Envoi des anecdotes quotidiennes (${hour}h)...`);
-      await AnecdoteService.sendDailyAnecdotes();
-    }, { timezone: "Europe/Paris" });
-  }
+  // Un seul cron horaire : à chaque heure pleine, on évalue pour chaque
+  // serveur si l'heure courante (dans son fuseau) fait partie de ses heures
+  // d'envoi configurées. Les horaires/fuseaux sont définis par serveur.
+  cron.schedule("0 * * * *", async () => {
+    await AnecdoteService.sendScheduledAnecdotes();
+  }, { timezone: "UTC" });
 
-  await LoggerService.info("📅 Planificateur d'anecdotes quotidiennes activé (8h00 et 20h00 chaque jour)");
+  await LoggerService.info("📅 Planificateur d'anecdotes activé (horaires et fuseaux configurables par serveur)");
 });
 
 bot.on("interactionCreate", async (interaction) => {

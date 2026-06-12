@@ -4,6 +4,8 @@ import axios from "axios";
 import { LoggerService } from "./LoggerService";
 import { GeminiService } from "./GeminiService";
 import { prisma } from "../lib/prisma";
+import { GuildSettingsService, type Language } from "./GuildSettingsService";
+import { TECH_TOPICS_BY_LANG } from "./techTopics";
 
 interface Anecdote {
   title: string;
@@ -13,112 +15,53 @@ interface Anecdote {
 }
 
 export class AnecdoteService {
-  private static readonly TECH_TOPICS = [
-    // Langages de programmation
-    "Python_(langage)", "Java_(langage)", "JavaScript", "C_(langage)", "C%2B%2B",
-    "Ruby_(langage)", "PHP", "Rust_(langage)", "Go_(langage)", "TypeScript",
-
-    // Entreprises et personnalités tech
-    "Steve_Jobs", "Bill_Gates", "Linus_Torvalds", "Alan_Turing", "Grace_Hopper",
-    "Ada_Lovelace", "Tim_Berners-Lee", "Elon_Musk", "Mark_Zuckerberg",
-    "Apple", "Microsoft", "Google", "Amazon_(entreprise)", "Meta_(entreprise)",
-    "Tesla_(entreprise)", "Netflix", "Nvidia", "Intel", "AMD",
-
-    // Technologies et innovations
-    "World_Wide_Web", "Bitcoin", "Blockchain", "ChatGPT", "DeepMind",
-    "Linux", "Android", "iOS", "Windows", "MacOS",
-    "Cloud_computing", "Machine_learning", "Deep_learning",
-    "Réalité_virtuelle", "Réalité_augmentée", "Metaverse",
-
-    // Événements et concepts
-    "Bug_de_l'an_2000", "Arpanet", "Premier_ordinateur", "Ordinateur_quantique",
-    "Transistor", "Microprocesseur", "Puce_électronique", "RAM_(informatique)",
-    "SSD", "GPU", "Internet_des_objets", "5G", "Fibre_optique",
-
-    // Logiciels et plateformes
-    "GitHub", "Stack_Overflow", "Reddit", "Discord_(logiciel)", "Slack_(plateforme)",
-    "Visual_Studio_Code", "Docker_(logiciel)", "Kubernetes",
-
-    // Jeux vidéo et gaming
-    "Minecraft", "Fortnite", "League_of_Legends", "PlayStation", "Xbox",
-    "Nintendo", "Steam_(plateforme)", "Twitch_(service)",
-
-    // Sécurité et cyberattaques
-    "WannaCry", "Ransomware", "Phishing", "Pare-feu_(informatique)",
-    "Chiffrement", "VPN", "Tor_(réseau)"
-  ];
+  /**
+   * Renvoie l'heure courante (0-23) dans un fuseau horaire donné.
+   */
+  public static getCurrentHourInTimezone(timezone: string): number {
+    const formatted = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hour: "numeric",
+      hour12: false,
+    }).format(new Date());
+    // "24" est renvoyé par certains environnements à minuit : on le ramène à 0.
+    return parseInt(formatted, 10) % 24;
+  }
 
   /**
-   * Envoie les anecdotes quotidiennes à tous les channels configurés
-   * Génère une anecdote différente par serveur
+   * Évalue, pour chaque serveur ayant des channels configurés, si l'heure
+   * courante (dans son fuseau) fait partie de ses heures d'envoi, et envoie
+   * une anecdote le cas échéant. Appelé par le cron horaire.
    */
-  public static async sendDailyAnecdotes(): Promise<void> {
+  public static async sendScheduledAnecdotes(): Promise<void> {
     try {
-      // Récupérer tous les channels configurés
-      const anecdoteChannels = await prisma.anecdoteChannel.findMany();
+      // Serveurs distincts ayant au moins un channel configuré
+      const rows = await prisma.anecdoteChannel.findMany({
+        distinct: ["guildId"],
+        select: { guildId: true },
+      });
 
-      if (anecdoteChannels.length === 0) {
-        await LoggerService.warning("Aucun channel d'anecdotes configuré");
+      if (rows.length === 0) {
         return;
       }
 
-      // Regrouper les channels par serveur
-      const channelsByGuild = new Map<string, typeof anecdoteChannels>();
-      for (const channel of anecdoteChannels) {
-        const guildChannels = channelsByGuild.get(channel.guildId) || [];
-        guildChannels.push(channel);
-        channelsByGuild.set(channel.guildId, guildChannels);
-      }
-
-      await LoggerService.info(`📤 Envoi des anecdotes à ${channelsByGuild.size} serveur(s)...`);
-
-      // Générer et envoyer une anecdote différente par serveur
-      for (const [guildId, channels] of channelsByGuild) {
+      for (const { guildId } of rows) {
         try {
-          const anecdote = await this.fetchAnecdoteFromWeb(guildId);
+          const settings = await GuildSettingsService.get(guildId);
+          const currentHour = this.getCurrentHourInTimezone(settings.timezone);
 
-          if (!anecdote) {
-            await LoggerService.error(`Impossible de récupérer une anecdote pour le serveur ${guildId}`);
+          if (!settings.hours.includes(currentHour)) {
             continue;
           }
 
-          // Sauvegarder le titre de l'anecdote pour ce serveur
-          await this.saveAnecdoteTitle(anecdote.title, guildId);
-
-          // Créer l'embed
-          const embed = this.createAnecdoteEmbed(anecdote);
-
-          // Envoyer à chaque channel du serveur (en parallèle)
-          await Promise.allSettled(channels.map(async (channelConfig) => {
-            try {
-              const channel = await bot.channels.fetch(channelConfig.channelId);
-
-              if (!channel) {
-                await LoggerService.warning(`Channel ${channelConfig.channelId} introuvable, suppression de la config...`);
-                await prisma.anecdoteChannel.delete({ where: { id: channelConfig.id } });
-                return;
-              }
-
-              if (!(channel instanceof TextChannel) && !(channel instanceof NewsChannel)) {
-                await LoggerService.warning(`Channel ${channelConfig.channelId} n'est pas un canal textuel ou d'annonces`);
-                return;
-              }
-
-              const content = channelConfig.roleId ? `<@&${channelConfig.roleId}>` : undefined;
-              await channel.send({ content, embeds: [embed] });
-              await LoggerService.success(`Anecdote envoyée à #${channel.name} (${guildId})`);
-            } catch (error) {
-              await LoggerService.error(`Erreur lors de l'envoi au channel ${channelConfig.channelId}: ${error}`);
-            }
-          }));
-
-          await LoggerService.success(`Anecdote quotidienne envoyée au serveur ${guildId}: ${anecdote.title}`);
+          await LoggerService.info(`🕐 Envoi programmé pour le serveur ${guildId} (${currentHour}h ${settings.timezone})`);
+          await this.sendAnecdotesToGuild(guildId);
         } catch (error) {
-          await LoggerService.error(`Erreur lors de l'envoi des anecdotes au serveur ${guildId}: ${error}`);
+          await LoggerService.error(`Erreur lors de l'envoi programmé au serveur ${guildId}: ${error}`);
         }
       }
     } catch (error) {
-      await LoggerService.error(`Erreur lors de l'envoi des anecdotes quotidiennes: ${error}`);
+      await LoggerService.error(`Erreur lors de l'évaluation des envois programmés: ${error}`);
     }
   }
 
@@ -136,7 +79,8 @@ export class AnecdoteService {
         return [];
       }
 
-      const anecdote = await this.fetchAnecdoteFromWeb(guildId);
+      const language = await GuildSettingsService.getLanguage(guildId);
+      const anecdote = await this.fetchAnecdoteFromWeb(guildId, language);
 
       if (!anecdote) {
         await LoggerService.error("Impossible de récupérer une anecdote depuis le web");
@@ -191,7 +135,8 @@ export class AnecdoteService {
         return false;
       }
 
-      const anecdote = await this.fetchAnecdoteFromWeb(guildId);
+      const language = await GuildSettingsService.getLanguage(guildId);
+      const anecdote = await this.fetchAnecdoteFromWeb(guildId, language);
 
       if (!anecdote) {
         await LoggerService.error("Impossible de récupérer une anecdote depuis le web");
@@ -238,14 +183,21 @@ export class AnecdoteService {
     return prisma.sentAnecdote.count();
   }
 
-  private static async fetchAnecdoteFromWeb(guildId?: string): Promise<Anecdote | null> {
-    try {
-      await LoggerService.info(`🤖 Tentative de génération d'anecdote via Gemini...`);
+  /** Libellé de la source "généré par IA" selon la langue du serveur. */
+  private static readonly AI_SOURCE_NAME: Record<Language, string> = {
+    fr: "Généré par IA (Gemini)",
+    en: "AI-generated (Gemini)",
+    es: "Generado por IA (Gemini)",
+    de: "KI-generiert (Gemini)",
+    it: "Generato da IA (Gemini)",
+  };
 
-      // Essayer d'abord avec Gemini (si guildId fourni, filtrera les anecdotes déjà envoyées)
-      const geminiResult = guildId
-        ? await GeminiService.generateTechAnecdote(guildId)
-        : null;
+  private static async fetchAnecdoteFromWeb(guildId: string, language: Language): Promise<Anecdote | null> {
+    try {
+      await LoggerService.info(`🤖 Tentative de génération d'anecdote via Gemini (${language})...`);
+
+      // Essayer d'abord avec Gemini (filtre les anecdotes déjà envoyées sur ce serveur)
+      const geminiResult = await GeminiService.generateTechAnecdote(guildId, language);
 
       if (geminiResult) {
         await LoggerService.success(`Anecdote générée avec succès via Gemini`);
@@ -253,7 +205,7 @@ export class AnecdoteService {
         // Ajouter "Généré par Gemini" comme première source
         const sources = [
           {
-            name: "Généré par IA (Gemini)",
+            name: this.AI_SOURCE_NAME[language],
             url: "https://ai.google.dev/gemini-api"
           },
           ...geminiResult.sources // Ajouter les sources fournies par Gemini
@@ -267,8 +219,8 @@ export class AnecdoteService {
       }
 
       // Fallback sur Wikipedia si Gemini échoue
-      await LoggerService.warning(`Gemini non disponible, fallback sur Wikipedia...`);
-      const anecdote = await this.fetchFromWikipedia();
+      await LoggerService.warning(`Gemini non disponible, fallback sur Wikipedia (${language})...`);
+      const anecdote = await this.fetchFromWikipedia(language);
       if (anecdote) {
         await LoggerService.success(`Anecdote récupérée avec succès depuis Wikipedia`);
         return anecdote;
@@ -281,16 +233,38 @@ export class AnecdoteService {
     }
   }
 
-  private static async fetchFromWikipedia(): Promise<Anecdote | null> {
+  private static async fetchFromWikipedia(language: Language): Promise<Anecdote | null> {
+    const topics = TECH_TOPICS_BY_LANG[language];
+    // Plusieurs tentatives sur des sujets aléatoires différents : certains
+    // titres peuvent ne pas exister dans une édition donnée (404).
+    const MAX_ATTEMPTS = 3;
+    const tried = new Set<string>();
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      let randomTopic = topics[Math.floor(Math.random() * topics.length)];
+      // Éviter de retenter le même sujet
+      let guard = 0;
+      while (tried.has(randomTopic) && guard++ < topics.length) {
+        randomTopic = topics[Math.floor(Math.random() * topics.length)];
+      }
+      tried.add(randomTopic);
+
+      const result = await this.fetchWikipediaTopic(language, randomTopic);
+      if (result) {
+        return result;
+      }
+    }
+
+    return null;
+  }
+
+  private static async fetchWikipediaTopic(language: Language, topic: string): Promise<Anecdote | null> {
     try {
-      // Choisir un sujet tech aléatoire
-      const randomTopic = this.TECH_TOPICS[Math.floor(Math.random() * this.TECH_TOPICS.length)];
+      await LoggerService.info(`Tentative Wikipedia (${language}) pour: ${topic}`);
 
-      await LoggerService.info(`Tentative Wikipedia pour: ${randomTopic}`);
-
-      // Utiliser Wikipedia FRANÇAIS avec un User-Agent valide
+      // Utiliser l'édition Wikipedia de la langue du serveur avec un User-Agent valide
       const response = await axios.get(
-        `https://fr.wikipedia.org/api/rest_v1/page/summary/${randomTopic}`,
+        `https://${language}.wikipedia.org/api/rest_v1/page/summary/${topic}`,
         {
           headers: {
             'User-Agent': 'Discord Bot Anecdotes/1.0 (https://github.com; contact@example.com)',
@@ -347,7 +321,7 @@ export class AnecdoteService {
         sources: [
           {
             name: "Wikipedia",
-            url: data.content_urls?.desktop?.page || `https://fr.wikipedia.org/wiki/${randomTopic}`,
+            url: data.content_urls?.desktop?.page || `https://${language}.wikipedia.org/wiki/${topic}`,
           },
         ],
       };

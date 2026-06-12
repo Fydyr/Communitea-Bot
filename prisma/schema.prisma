@@ -29,3 +29,12 @@ model SentAnecdote {
   @@index([title])
   @@index([guildId])
 }
+
+model GuildSettings {
+  id        String   @id @default(cuid())
+  guildId   String   @unique
+  hours     Int[]    @default([8, 20])
+  timezone  String   @default("Europe/Paris")
+  language  String   @default("fr")
+  updatedAt DateTime @updatedAt
+}

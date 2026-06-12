@@ -85,10 +85,24 @@ Communitea-Bot est un bot Discord moderne et complet, développé en TypeScript 
 
 ### 📚 Anecdotes
 
-- `/send-anecdote` : Envoie manuellement une anecdote (Admin seulement)
-- Envoi automatique quotidien à 8h00 et 20h00 (fuseau Europe/Paris)
-- Génération par IA (Gemini) avec sources vérifiables
-- Plus de 60 sujets tech différents couverts
+Configuration des channels (Admin) :
+- `/setup` : Configure un channel pour recevoir les anecdotes (rôle à mentionner optionnel)
+- `/remove` : Retire un channel de la configuration
+- `/list` : Liste les channels configurés sur ce serveur
+- `/stats` : Affiche les statistiques des anecdotes
+- `/send-anecdote` : Envoie manuellement une anecdote (propriétaire seulement)
+
+Planification par serveur (Admin) :
+- `/hour-add` et `/hour-remove` : Ajoute/retire une heure d'envoi (0-23)
+- `/timezone` : Définit le fuseau horaire (ex: `Europe/Paris`, `America/New_York`)
+- `/language` : Définit la langue des anecdotes **et** des messages du bot (fr, en, es, de, it)
+- `/schedule` : Affiche l'horaire courant (heures, fuseau, langue)
+
+Par défaut (sans configuration) : envoi à 8h00 et 20h00, fuseau Europe/Paris, en français.
+
+- Génération par IA (Gemini) avec sources vérifiables, dans la langue du serveur
+- Fallback Wikipedia dans la langue configurée
+- Plus de 60 sujets tech différents couverts par langue
 
 ### 🔧 Utilitaires
 
