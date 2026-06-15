@@ -44,6 +44,48 @@ export const fr = {
   "timezone.success": "✅ Fuseau horaire défini sur `{timezone}`.",
 
   "language.success": "✅ Langue définie sur **{language}**.",
+
+  "translate.title": "🌍 Traduction en {language}",
+  "translate.footer": "Traduit automatiquement",
+
+  "about.failed": "❌ Impossible de générer une anecdote sur ce sujet. Réessaie plus tard.",
+
+  "theme.langages": "Langages de programmation",
+  "theme.entreprises": "Entreprises tech",
+  "theme.personnalites": "Personnalités tech",
+  "theme.jeux-video": "Jeux vidéo",
+  "theme.securite": "Cybersécurité",
+  "theme.hardware": "Matériel informatique",
+  "theme.web": "Web et internet",
+  "theme.ia": "Intelligence artificielle",
+  "theme.histoire": "Histoire de l'informatique",
+
+  "themeAdd.invalid": "❌ Thème inconnu.",
+  "themeAdd.exists": "⚠️ Le thème **{theme}** est déjà actif.",
+  "themeAdd.added": "✅ Thème **{theme}** ajouté. Thèmes actifs : {themes}.",
+  "themeRemove.notPresent": "⚠️ Le thème **{theme}** n'est pas actif.",
+  "themeRemove.removed": "✅ Thème **{theme}** retiré. Thèmes actifs : {themes}.",
+
+  "schedule.themes": "🏷️ Thèmes",
+  "schedule.allThemes": "Tous",
+  "schedule.quizHours": "🧠 Quiz programmés",
+
+  "quiz.title": "🧠 Quiz",
+  "quiz.footer": "Tu as 2 minutes pour répondre",
+  "quiz.correct": "✅ Bonne réponse ! {explanation}",
+  "quiz.incorrect": "❌ Mauvaise réponse. La bonne réponse était : **{answer}**.\n{explanation}",
+  "quiz.reveal": "✅ Réponse : **{answer}**",
+  "quiz.failed": "❌ Impossible de générer un quiz. Réessaie plus tard.",
+
+  "quizHour.exists": "⚠️ L'heure de quiz {hour}h est déjà configurée.",
+  "quizHour.added": "✅ Heure de quiz {hour}h ajoutée. Quiz programmés : {hours}.",
+  "quizHour.notPresent": "⚠️ L'heure de quiz {hour}h n'est pas configurée.",
+  "quizHour.removed": "✅ Heure de quiz {hour}h retirée. Quiz programmés : {hours}.",
+  "quizHour.emptied": "✅ Heure de quiz {hour}h retirée. Plus aucun quiz programmé.",
+
+  "history.title": "📜 Historique des anecdotes",
+  "history.empty": "📭 Aucune anecdote n'a encore été envoyée sur ce serveur.",
+  "history.footer": "Page {page}/{pages} · {total} anecdote(s)",
 } as const;
 
 export type MessageKey = keyof typeof fr;

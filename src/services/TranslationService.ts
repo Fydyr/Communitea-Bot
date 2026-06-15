@@ -1,8 +1,32 @@
 import axios from "axios";
 import { LoggerService } from "./LoggerService";
+import { GeminiService } from "./GeminiService";
+import type { FlagLanguage } from "./flagLanguages";
 
 export class TranslationService {
   private static readonly MYMEMORY_API = "https://api.mymemory.translated.net/get";
+
+  /**
+   * Traduit un texte vers la langue cible (issue d'un drapeau).
+   * Utilise Gemini (détection auto de la source, n'importe quelle cible) avec
+   * MyMemory en fallback pour le français. Renvoie null si tout échoue.
+   */
+  public static async translate(text: string, target: FlagLanguage): Promise<string | null> {
+    const viaGemini = await GeminiService.translate(text, target.name);
+    if (viaGemini) {
+      return viaGemini;
+    }
+
+    // Fallback : MyMemory ne sait traduire de façon fiable que vers le français ici.
+    if (target.code === "fr") {
+      const viaMyMemory = await this.translateToFrench(text);
+      if (viaMyMemory && viaMyMemory !== text) {
+        return viaMyMemory;
+      }
+    }
+
+    return null;
+  }
 
   /**
    * Traduit un texte de l'anglais vers le français

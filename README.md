@@ -455,11 +455,8 @@ Actuellement, aucun test automatisé n'est configuré. Pour tester le bot :
 
 ### Fonctionnalités implémentées
 
-- [X] Système de modération complet (warn, kick, ban, timeout)
-- [X] Modération automatique avec détection de contenu inapproprié
 - [X] Système d'anecdotes quotidiennes avec IA (Gemini)
 - [X] Logging avancé avec webhook Discord
-- [X] Gestion des infractions avec historique
 - [X] Actions automatiques basées sur le nombre d'avertissements
 - [X] Déploiement Docker
 - [X] Nettoyage automatique des infractions expirées
@@ -468,13 +465,11 @@ Actuellement, aucun test automatisé n'est configuré. Pour tester le bot :
 
 - [ ] Base de données persistante (PostgreSQL/MongoDB)
 - [ ] Commandes de configuration dynamiques
-- [ ] Système de tickets et support
 - [ ] Statistiques et analytics
 - [ ] Tests unitaires et d'intégration
 - [ ] Système de rôles et permissions personnalisables
 - [ ] Support multi-serveurs
 - [ ] Commandes de divertissement (jeux, musique)
-- [ ] Système de niveaux et XP
 
 ---
 

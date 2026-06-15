@@ -36,5 +36,21 @@ model GuildSettings {
   hours     Int[]    @default([8, 20])
   timezone  String   @default("Europe/Paris")
   language  String   @default("fr")
+  themes    String[] @default([])
+  quizHours Int[]    @default([])
   updatedAt DateTime @updatedAt
+}
+
+model AnecdoteMessage {
+  id        String   @id @default(cuid())
+  guildId   String
+  channelId String
+  messageId String   @unique
+  title     String
+  language  String
+  upvotes   Int      @default(0)
+  downvotes Int      @default(0)
+  sentAt    DateTime @default(now())
+
+  @@index([guildId])
 }

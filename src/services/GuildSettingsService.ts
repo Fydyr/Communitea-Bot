@@ -7,6 +7,22 @@ export const SUPPORTED_LANGUAGES = ["fr", "en", "es", "de", "it"] as const;
 export type Language = (typeof SUPPORTED_LANGUAGES)[number];
 
 /**
+ * Thèmes d'anecdotes sélectionnables par serveur. Liste vide = tous les thèmes.
+ */
+export const SUPPORTED_THEMES = [
+  "langages",
+  "entreprises",
+  "personnalites",
+  "jeux-video",
+  "securite",
+  "hardware",
+  "web",
+  "ia",
+  "histoire",
+] as const;
+export type Theme = (typeof SUPPORTED_THEMES)[number];
+
+/**
  * Valeurs par défaut appliquées aux serveurs sans configuration explicite.
  * Reproduit le comportement historique (8h/20h, Europe/Paris, français).
  */
@@ -18,6 +34,8 @@ export interface GuildSettingsValues {
   hours: number[];
   timezone: string;
   language: Language;
+  themes: Theme[];
+  quizHours: number[];
   /** true si aucune ligne en base : ce sont les valeurs par défaut. */
   isDefault: boolean;
 }
@@ -31,8 +49,28 @@ export type RemoveHourResult =
   | { status: "removed"; hours: number[]; emptied: boolean }
   | { status: "not-present" };
 
+export type AddThemeResult =
+  | { status: "added"; themes: Theme[] }
+  | { status: "exists"; themes: Theme[] }
+  | { status: "invalid" };
+
+export type RemoveThemeResult =
+  | { status: "removed"; themes: Theme[] }
+  | { status: "not-present" };
+
+/** Champ de type Int[] manipulable via add/remove (heures d'envoi ou de quiz). */
+type IntListField = "hours" | "quizHours";
+
 function isLanguage(value: string): value is Language {
   return (SUPPORTED_LANGUAGES as readonly string[]).includes(value);
+}
+
+function isTheme(value: string): value is Theme {
+  return (SUPPORTED_THEMES as readonly string[]).includes(value);
+}
+
+function normalizeThemes(values: string[]): Theme[] {
+  return values.filter(isTheme);
 }
 
 function normalizeLanguage(value: string): Language {
@@ -75,6 +113,8 @@ export class GuildSettingsService {
         hours: [...DEFAULT_HOURS],
         timezone: DEFAULT_TIMEZONE,
         language: DEFAULT_LANGUAGE,
+        themes: [],
+        quizHours: [],
         isDefault: true,
       };
     }
@@ -83,6 +123,8 @@ export class GuildSettingsService {
       hours: sortHours(row.hours),
       timezone: row.timezone,
       language: normalizeLanguage(row.language),
+      themes: normalizeThemes(row.themes),
+      quizHours: sortHours(row.quizHours),
       isDefault: false,
     };
   }
@@ -97,10 +139,11 @@ export class GuildSettingsService {
   }
 
   /**
-   * Ajoute une heure d'envoi. Sur un serveur sans ligne, crée une
-   * configuration partant d'une liste explicite contenant cette seule heure.
+   * Ajoute une valeur à un champ Int[] (heures d'envoi ou de quiz). Sur un
+   * serveur sans ligne, crée une configuration partant d'une liste explicite
+   * contenant cette seule valeur.
    */
-  static async addHour(guildId: string, hour: number): Promise<AddHourResult> {
+  private static async addToIntList(guildId: string, field: IntListField, hour: number): Promise<AddHourResult> {
     if (!this.isValidHour(hour)) {
       return { status: "invalid" };
     }
@@ -109,40 +152,108 @@ export class GuildSettingsService {
 
     if (!row) {
       const created = await prisma.guildSettings.create({
-        data: { guildId, hours: [hour] },
+        data: { guildId, [field]: [hour] },
       });
-      return { status: "added", hours: sortHours(created.hours) };
+      return { status: "added", hours: sortHours(created[field]) };
     }
 
-    if (row.hours.includes(hour)) {
-      return { status: "exists", hours: sortHours(row.hours) };
+    if (row[field].includes(hour)) {
+      return { status: "exists", hours: sortHours(row[field]) };
     }
 
     const updated = await prisma.guildSettings.update({
       where: { guildId },
-      data: { hours: sortHours([...row.hours, hour]) },
+      data: { [field]: sortHours([...row[field], hour]) },
     });
-    return { status: "added", hours: sortHours(updated.hours) };
+    return { status: "added", hours: sortHours(updated[field]) };
   }
 
   /**
-   * Retire une heure d'envoi. Un serveur sans ligne (ou ne contenant pas
-   * l'heure) renvoie "not-present" : il faut avoir ajouté l'heure au préalable.
+   * Retire une valeur d'un champ Int[]. Un serveur sans ligne (ou ne contenant
+   * pas la valeur) renvoie "not-present".
    */
-  static async removeHour(guildId: string, hour: number): Promise<RemoveHourResult> {
+  private static async removeFromIntList(guildId: string, field: IntListField, hour: number): Promise<RemoveHourResult> {
     const row = await prisma.guildSettings.findUnique({ where: { guildId } });
 
-    if (!row || !row.hours.includes(hour)) {
+    if (!row || !row[field].includes(hour)) {
       return { status: "not-present" };
     }
 
-    const remaining = sortHours(row.hours.filter((h) => h !== hour));
+    const remaining = sortHours(row[field].filter((h) => h !== hour));
     const updated = await prisma.guildSettings.update({
       where: { guildId },
-      data: { hours: remaining },
+      data: { [field]: remaining },
     });
 
-    return { status: "removed", hours: sortHours(updated.hours), emptied: updated.hours.length === 0 };
+    return { status: "removed", hours: sortHours(updated[field]), emptied: updated[field].length === 0 };
+  }
+
+  /** Ajoute une heure d'envoi d'anecdote (0-23). */
+  static addHour(guildId: string, hour: number): Promise<AddHourResult> {
+    return this.addToIntList(guildId, "hours", hour);
+  }
+
+  /** Retire une heure d'envoi d'anecdote. */
+  static removeHour(guildId: string, hour: number): Promise<RemoveHourResult> {
+    return this.removeFromIntList(guildId, "hours", hour);
+  }
+
+  /** Ajoute une heure d'envoi de quiz (0-23). */
+  static addQuizHour(guildId: string, hour: number): Promise<AddHourResult> {
+    return this.addToIntList(guildId, "quizHours", hour);
+  }
+
+  /** Retire une heure d'envoi de quiz. */
+  static removeQuizHour(guildId: string, hour: number): Promise<RemoveHourResult> {
+    return this.removeFromIntList(guildId, "quizHours", hour);
+  }
+
+  static isValidTheme(value: string): value is Theme {
+    return isTheme(value);
+  }
+
+  /**
+   * Ajoute un thème. Sur un serveur sans ligne, crée une configuration partant
+   * d'une liste explicite contenant ce seul thème.
+   */
+  static async addTheme(guildId: string, theme: string): Promise<AddThemeResult> {
+    if (!isTheme(theme)) {
+      return { status: "invalid" };
+    }
+
+    const row = await prisma.guildSettings.findUnique({ where: { guildId } });
+
+    if (!row) {
+      const created = await prisma.guildSettings.create({
+        data: { guildId, themes: [theme] },
+      });
+      return { status: "added", themes: normalizeThemes(created.themes) };
+    }
+
+    if (row.themes.includes(theme)) {
+      return { status: "exists", themes: normalizeThemes(row.themes) };
+    }
+
+    const updated = await prisma.guildSettings.update({
+      where: { guildId },
+      data: { themes: [...row.themes, theme] },
+    });
+    return { status: "added", themes: normalizeThemes(updated.themes) };
+  }
+
+  /** Retire un thème. */
+  static async removeTheme(guildId: string, theme: string): Promise<RemoveThemeResult> {
+    const row = await prisma.guildSettings.findUnique({ where: { guildId } });
+
+    if (!row || !row.themes.includes(theme)) {
+      return { status: "not-present" };
+    }
+
+    const updated = await prisma.guildSettings.update({
+      where: { guildId },
+      data: { themes: row.themes.filter((t) => t !== theme) },
+    });
+    return { status: "removed", themes: normalizeThemes(updated.themes) };
   }
 
   /** Définit le fuseau horaire (upsert ; crée la ligne avec les défauts si absente). */

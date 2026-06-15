@@ -46,4 +46,46 @@ export const es: Record<MessageKey, string> = {
   "timezone.success": "✅ Zona horaria configurada en `{timezone}`.",
 
   "language.success": "✅ Idioma configurado en **{language}**.",
+
+  "translate.title": "🌍 Traducción al {language}",
+  "translate.footer": "Traducido automáticamente",
+
+  "about.failed": "❌ No se pudo generar una anécdota sobre este tema. Inténtalo más tarde.",
+
+  "theme.langages": "Lenguajes de programación",
+  "theme.entreprises": "Empresas tecnológicas",
+  "theme.personnalites": "Personalidades tech",
+  "theme.jeux-video": "Videojuegos",
+  "theme.securite": "Ciberseguridad",
+  "theme.hardware": "Hardware informático",
+  "theme.web": "Web e internet",
+  "theme.ia": "Inteligencia artificial",
+  "theme.histoire": "Historia de la informática",
+
+  "themeAdd.invalid": "❌ Tema desconocido.",
+  "themeAdd.exists": "⚠️ El tema **{theme}** ya está activo.",
+  "themeAdd.added": "✅ Tema **{theme}** añadido. Temas activos: {themes}.",
+  "themeRemove.notPresent": "⚠️ El tema **{theme}** no está activo.",
+  "themeRemove.removed": "✅ Tema **{theme}** eliminado. Temas activos: {themes}.",
+
+  "schedule.themes": "🏷️ Temas",
+  "schedule.allThemes": "Todos",
+  "schedule.quizHours": "🧠 Cuestionarios programados",
+
+  "quiz.title": "🧠 Cuestionario",
+  "quiz.footer": "Tienes 2 minutos para responder",
+  "quiz.correct": "✅ ¡Correcto! {explanation}",
+  "quiz.incorrect": "❌ Respuesta incorrecta. La respuesta correcta era: **{answer}**.\n{explanation}",
+  "quiz.reveal": "✅ Respuesta: **{answer}**",
+  "quiz.failed": "❌ No se pudo generar un cuestionario. Inténtalo más tarde.",
+
+  "quizHour.exists": "⚠️ La hora de cuestionario {hour}:00 ya está configurada.",
+  "quizHour.added": "✅ Hora de cuestionario {hour}:00 añadida. Cuestionarios programados: {hours}.",
+  "quizHour.notPresent": "⚠️ La hora de cuestionario {hour}:00 no está configurada.",
+  "quizHour.removed": "✅ Hora de cuestionario {hour}:00 eliminada. Cuestionarios programados: {hours}.",
+  "quizHour.emptied": "✅ Hora de cuestionario {hour}:00 eliminada. No hay más cuestionarios programados.",
+
+  "history.title": "📜 Historial de anécdotas",
+  "history.empty": "📭 Aún no se ha enviado ninguna anécdota en este servidor.",
+  "history.footer": "Página {page}/{pages} · {total} anécdota(s)",
 };

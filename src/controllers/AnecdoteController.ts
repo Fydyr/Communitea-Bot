@@ -1,22 +1,28 @@
-import { Discord, Slash, SlashOption, SlashChoice } from "discordx";
+import { Discord, Slash, SlashOption, SlashChoice, ButtonComponent } from "discordx";
 import {
   CommandInteraction,
+  ButtonInteraction,
   PermissionFlagsBits,
   ChannelType,
   TextChannel,
   NewsChannel,
   Role,
   EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   ApplicationCommandOptionType
 } from "discord.js";
 import { AnecdoteService } from "../services/AnecdoteService";
+import { QuizService } from "../services/QuizService";
 import { LoggerService } from "../services/LoggerService";
 import {
   GuildSettingsService,
   DEFAULT_LANGUAGE,
-  type Language
+  type Language,
+  type Theme
 } from "../services/GuildSettingsService";
-import { t, LANGUAGE_LABELS } from "../i18n";
+import { t, LANGUAGE_LABELS, themeLabel } from "../i18n";
 import { prisma } from "../lib/prisma";
 import { config } from "../config";
 
@@ -26,12 +32,66 @@ async function langOf(guildId: string | null): Promise<Language> {
 }
 
 /** Formate une liste d'heures pour l'affichage selon la langue. */
-function formatHours(hours: number[], lang: Language): string {
+function formatHours(hours: number[], lang: Language, emptyLabel?: string): string {
   if (hours.length === 0) {
-    return t(lang, "schedule.noHours");
+    return emptyLabel ?? t(lang, "schedule.noHours");
   }
   const fmt = lang === "fr" ? (h: number) => `${h}h` : (h: number) => `${h}:00`;
   return hours.map(fmt).join(", ");
+}
+
+/** Formate la liste des thèmes pour l'affichage (ou "Tous" si vide). */
+function formatThemes(themes: Theme[], lang: Language): string {
+  if (themes.length === 0) {
+    return t(lang, "schedule.allThemes");
+  }
+  return themes.map((theme) => themeLabel(lang, theme)).join(", ");
+}
+
+interface HistoryPage {
+  items: { title: string; sentAt: Date; upvotes: number; downvotes: number }[];
+  total: number;
+  pages: number;
+  page: number;
+}
+
+/** Construit l'embed + boutons de pagination de l'historique. */
+function buildHistoryView(data: HistoryPage, lang: Language): {
+  embeds: EmbedBuilder[];
+  components: ActionRowBuilder<ButtonBuilder>[];
+} {
+  const embed = new EmbedBuilder()
+    .setTitle(t(lang, "history.title"))
+    .setColor(0x5865F2)
+    .setTimestamp();
+
+  if (data.total === 0) {
+    embed.setDescription(t(lang, "history.empty"));
+    return { embeds: [embed], components: [] };
+  }
+
+  const lines = data.items.map((item) => {
+    const ts = Math.floor(item.sentAt.getTime() / 1000);
+    return `**${item.title}**\n<t:${ts}:f> · 👍 ${item.upvotes} · 👎 ${item.downvotes}`;
+  });
+  embed
+    .setDescription(lines.join("\n\n"))
+    .setFooter({ text: t(lang, "history.footer", { page: data.page + 1, pages: data.pages, total: data.total }) });
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`hist:prev:${data.page - 1}`)
+      .setLabel("◀")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(data.page <= 0),
+    new ButtonBuilder()
+      .setCustomId(`hist:next:${data.page + 1}`)
+      .setLabel("▶")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(data.page >= data.pages - 1)
+  );
+
+  return { embeds: [embed], components: [row] };
 }
 
 @Discord()
@@ -259,6 +319,42 @@ export class AnecdoteController {
   }
 
   @Slash({
+    name: "anecdote-about",
+    description: "Génère une anecdote sur un sujet précis"
+  })
+  async anecdoteAbout(
+    @SlashOption({
+      name: "sujet",
+      description: "Le sujet de l'anecdote (ex: Linux, Ada Lovelace, le bug de l'an 2000)",
+      required: true,
+      type: ApplicationCommandOptionType.String
+    })
+    topic: string,
+    interaction: CommandInteraction
+  ): Promise<void> {
+    await interaction.deferReply();
+    const lang = await langOf(interaction.guildId);
+
+    try {
+      const result = await AnecdoteService.buildAboutEmbed(topic, lang);
+      if (!result) {
+        await interaction.editReply(t(lang, "about.failed"));
+        return;
+      }
+
+      await interaction.editReply({ embeds: [result.embed] });
+
+      if (interaction.guildId) {
+        const message = await interaction.fetchReply();
+        await AnecdoteService.trackSentMessage(message, interaction.guildId, result.title, lang);
+      }
+    } catch (error) {
+      await LoggerService.error(`Erreur /anecdote-about: ${error}`);
+      await interaction.editReply(t(lang, "about.failed"));
+    }
+  }
+
+  @Slash({
     name: "hour-add",
     description: "Ajoute une heure d'envoi quotidien des anecdotes (0-23)",
     defaultMemberPermissions: PermissionFlagsBits.Administrator
@@ -372,7 +468,9 @@ export class AnecdoteController {
         .addFields(
           { name: t(lang, "schedule.hours"), value: formatHours(settings.hours, settings.language), inline: true },
           { name: t(lang, "schedule.timezone"), value: `\`${settings.timezone}\``, inline: true },
-          { name: t(lang, "schedule.language"), value: LANGUAGE_LABELS[settings.language], inline: true }
+          { name: t(lang, "schedule.language"), value: LANGUAGE_LABELS[settings.language], inline: true },
+          { name: t(lang, "schedule.themes"), value: formatThemes(settings.themes, settings.language), inline: true },
+          { name: t(lang, "schedule.quizHours"), value: formatHours(settings.quizHours, settings.language, "-"), inline: true }
         )
         .setTimestamp();
 
@@ -465,6 +563,274 @@ export class AnecdoteController {
     } catch (error) {
       await LoggerService.error(`Erreur lors de la définition de la langue: ${error}`);
       await interaction.editReply(t(DEFAULT_LANGUAGE, "common.error"));
+    }
+  }
+
+  @Slash({
+    name: "theme-add",
+    description: "Ajoute un thème aux anecdotes générées sur ce serveur",
+    defaultMemberPermissions: PermissionFlagsBits.Administrator
+  })
+  async addTheme(
+    @SlashChoice({ name: "Langages de programmation", value: "langages" })
+    @SlashChoice({ name: "Entreprises tech", value: "entreprises" })
+    @SlashChoice({ name: "Personnalités tech", value: "personnalites" })
+    @SlashChoice({ name: "Jeux vidéo", value: "jeux-video" })
+    @SlashChoice({ name: "Cybersécurité", value: "securite" })
+    @SlashChoice({ name: "Matériel informatique", value: "hardware" })
+    @SlashChoice({ name: "Web et internet", value: "web" })
+    @SlashChoice({ name: "Intelligence artificielle", value: "ia" })
+    @SlashChoice({ name: "Histoire de l'informatique", value: "histoire" })
+    @SlashOption({
+      name: "theme",
+      description: "Le thème à ajouter",
+      required: true,
+      type: ApplicationCommandOptionType.String
+    })
+    theme: string,
+    interaction: CommandInteraction
+  ): Promise<void> {
+    await interaction.deferReply({ flags: 64 });
+    const lang = await langOf(interaction.guildId);
+
+    try {
+      if (!interaction.guildId) {
+        await interaction.editReply(t(lang, "common.notInGuild"));
+        return;
+      }
+
+      const result = await GuildSettingsService.addTheme(interaction.guildId, theme);
+
+      switch (result.status) {
+        case "invalid":
+          await interaction.editReply(t(lang, "themeAdd.invalid"));
+          return;
+        case "exists":
+          await interaction.editReply(t(lang, "themeAdd.exists", { theme: themeLabel(lang, theme as Theme) }));
+          return;
+        case "added":
+          await interaction.editReply(t(lang, "themeAdd.added", {
+            theme: themeLabel(lang, theme as Theme),
+            themes: formatThemes(result.themes, lang)
+          }));
+          await LoggerService.info(`Thème ajouté (${theme}) pour le serveur ${interaction.guildId}`);
+          return;
+      }
+    } catch (error) {
+      await LoggerService.error(`Erreur lors de l'ajout d'un thème: ${error}`);
+      await interaction.editReply(t(lang, "common.error"));
+    }
+  }
+
+  @Slash({
+    name: "theme-remove",
+    description: "Retire un thème des anecdotes générées sur ce serveur",
+    defaultMemberPermissions: PermissionFlagsBits.Administrator
+  })
+  async removeTheme(
+    @SlashChoice({ name: "Langages de programmation", value: "langages" })
+    @SlashChoice({ name: "Entreprises tech", value: "entreprises" })
+    @SlashChoice({ name: "Personnalités tech", value: "personnalites" })
+    @SlashChoice({ name: "Jeux vidéo", value: "jeux-video" })
+    @SlashChoice({ name: "Cybersécurité", value: "securite" })
+    @SlashChoice({ name: "Matériel informatique", value: "hardware" })
+    @SlashChoice({ name: "Web et internet", value: "web" })
+    @SlashChoice({ name: "Intelligence artificielle", value: "ia" })
+    @SlashChoice({ name: "Histoire de l'informatique", value: "histoire" })
+    @SlashOption({
+      name: "theme",
+      description: "Le thème à retirer",
+      required: true,
+      type: ApplicationCommandOptionType.String
+    })
+    theme: string,
+    interaction: CommandInteraction
+  ): Promise<void> {
+    await interaction.deferReply({ flags: 64 });
+    const lang = await langOf(interaction.guildId);
+
+    try {
+      if (!interaction.guildId) {
+        await interaction.editReply(t(lang, "common.notInGuild"));
+        return;
+      }
+
+      const result = await GuildSettingsService.removeTheme(interaction.guildId, theme);
+
+      if (result.status === "not-present") {
+        await interaction.editReply(t(lang, "themeRemove.notPresent", { theme: themeLabel(lang, theme as Theme) }));
+        return;
+      }
+
+      await interaction.editReply(t(lang, "themeRemove.removed", {
+        theme: themeLabel(lang, theme as Theme),
+        themes: formatThemes(result.themes, lang)
+      }));
+      await LoggerService.info(`Thème retiré (${theme}) pour le serveur ${interaction.guildId}`);
+    } catch (error) {
+      await LoggerService.error(`Erreur lors du retrait d'un thème: ${error}`);
+      await interaction.editReply(t(lang, "common.error"));
+    }
+  }
+
+  @Slash({
+    name: "quiz",
+    description: "Lance un quiz tech interactif"
+  })
+  async quiz(interaction: CommandInteraction): Promise<void> {
+    await interaction.deferReply();
+    const lang = await langOf(interaction.guildId);
+
+    try {
+      if (!interaction.guildId) {
+        await interaction.editReply(t(lang, "common.notInGuild"));
+        return;
+      }
+
+      const generated = await QuizService.generateForGuild(interaction.guildId);
+      if (!generated) {
+        await interaction.editReply(t(lang, "quiz.failed"));
+        return;
+      }
+
+      const { embeds, components } = QuizService.buildMessage(generated.quiz, generated.lang);
+      await interaction.editReply({ embeds, components });
+
+      const message = await interaction.fetchReply();
+      QuizService.attachCollector(message, generated.quiz, generated.lang);
+    } catch (error) {
+      await LoggerService.error(`Erreur /quiz: ${error}`);
+      await interaction.editReply(t(lang, "quiz.failed"));
+    }
+  }
+
+  @Slash({
+    name: "quiz-hour-add",
+    description: "Ajoute une heure d'envoi automatique de quiz (0-23)",
+    defaultMemberPermissions: PermissionFlagsBits.Administrator
+  })
+  async addQuizHour(
+    @SlashOption({
+      name: "hour",
+      description: "L'heure (0-23) à laquelle envoyer un quiz",
+      required: true,
+      type: ApplicationCommandOptionType.Integer,
+      minValue: 0,
+      maxValue: 23
+    })
+    hour: number,
+    interaction: CommandInteraction
+  ): Promise<void> {
+    await interaction.deferReply({ flags: 64 });
+    const lang = await langOf(interaction.guildId);
+
+    try {
+      if (!interaction.guildId) {
+        await interaction.editReply(t(lang, "common.notInGuild"));
+        return;
+      }
+
+      const result = await GuildSettingsService.addQuizHour(interaction.guildId, hour);
+
+      switch (result.status) {
+        case "invalid":
+          await interaction.editReply(t(lang, "hourAdd.invalid"));
+          return;
+        case "exists":
+          await interaction.editReply(t(lang, "quizHour.exists", { hour }));
+          return;
+        case "added":
+          await interaction.editReply(t(lang, "quizHour.added", { hour, hours: formatHours(result.hours, lang) }));
+          await LoggerService.info(`Heure de quiz ajoutée (${hour}h) pour le serveur ${interaction.guildId}`);
+          return;
+      }
+    } catch (error) {
+      await LoggerService.error(`Erreur lors de l'ajout d'une heure de quiz: ${error}`);
+      await interaction.editReply(t(lang, "common.error"));
+    }
+  }
+
+  @Slash({
+    name: "quiz-hour-remove",
+    description: "Retire une heure d'envoi automatique de quiz (0-23)",
+    defaultMemberPermissions: PermissionFlagsBits.Administrator
+  })
+  async removeQuizHour(
+    @SlashOption({
+      name: "hour",
+      description: "L'heure (0-23) à retirer",
+      required: true,
+      type: ApplicationCommandOptionType.Integer,
+      minValue: 0,
+      maxValue: 23
+    })
+    hour: number,
+    interaction: CommandInteraction
+  ): Promise<void> {
+    await interaction.deferReply({ flags: 64 });
+    const lang = await langOf(interaction.guildId);
+
+    try {
+      if (!interaction.guildId) {
+        await interaction.editReply(t(lang, "common.notInGuild"));
+        return;
+      }
+
+      const result = await GuildSettingsService.removeQuizHour(interaction.guildId, hour);
+
+      if (result.status === "not-present") {
+        await interaction.editReply(t(lang, "quizHour.notPresent", { hour }));
+        return;
+      }
+
+      if (result.emptied) {
+        await interaction.editReply(t(lang, "quizHour.emptied", { hour }));
+      } else {
+        await interaction.editReply(t(lang, "quizHour.removed", { hour, hours: formatHours(result.hours, lang) }));
+      }
+      await LoggerService.info(`Heure de quiz retirée (${hour}h) pour le serveur ${interaction.guildId}`);
+    } catch (error) {
+      await LoggerService.error(`Erreur lors du retrait d'une heure de quiz: ${error}`);
+      await interaction.editReply(t(lang, "common.error"));
+    }
+  }
+
+  @Slash({
+    name: "anecdote-history",
+    description: "Affiche l'historique des anecdotes envoyées sur ce serveur",
+    defaultMemberPermissions: PermissionFlagsBits.Administrator
+  })
+  async anecdoteHistory(interaction: CommandInteraction): Promise<void> {
+    await interaction.deferReply({ flags: 64 });
+    const lang = await langOf(interaction.guildId);
+
+    try {
+      if (!interaction.guildId) {
+        await interaction.editReply(t(lang, "common.notInGuild"));
+        return;
+      }
+
+      const data = await AnecdoteService.getHistoryPage(interaction.guildId, 0);
+      await interaction.editReply(buildHistoryView(data, lang));
+    } catch (error) {
+      await LoggerService.error(`Erreur /anecdote-history: ${error}`);
+      await interaction.editReply(t(lang, "common.error"));
+    }
+  }
+
+  @ButtonComponent({ id: /^hist:(prev|next):\d+$/ })
+  async historyPage(interaction: ButtonInteraction): Promise<void> {
+    try {
+      if (!interaction.guildId) {
+        return;
+      }
+
+      const lang = await langOf(interaction.guildId);
+      const page = parseInt(interaction.customId.split(":")[2] ?? "0", 10) || 0;
+      const data = await AnecdoteService.getHistoryPage(interaction.guildId, page);
+      await interaction.update(buildHistoryView(data, lang));
+    } catch (error) {
+      await LoggerService.error(`Erreur pagination historique: ${error}`);
     }
   }
 }

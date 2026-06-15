@@ -1,11 +1,12 @@
-import { TextChannel, EmbedBuilder, NewsChannel } from "discord.js";
+import { TextChannel, EmbedBuilder, NewsChannel, Message } from "discord.js";
 import { bot } from "../index";
 import axios from "axios";
 import { LoggerService } from "./LoggerService";
 import { GeminiService } from "./GeminiService";
 import { prisma } from "../lib/prisma";
-import { GuildSettingsService, type Language } from "./GuildSettingsService";
+import { GuildSettingsService, type Language, type Theme } from "./GuildSettingsService";
 import { TECH_TOPICS_BY_LANG } from "./techTopics";
+import { themeLabel } from "../i18n";
 
 interface Anecdote {
   title: string;
@@ -79,8 +80,8 @@ export class AnecdoteService {
         return [];
       }
 
-      const language = await GuildSettingsService.getLanguage(guildId);
-      const anecdote = await this.fetchAnecdoteFromWeb(guildId, language);
+      const settings = await GuildSettingsService.get(guildId);
+      const anecdote = await this.fetchAnecdoteFromWeb(guildId, settings.language, this.buildThemesContext(settings.themes));
 
       if (!anecdote) {
         await LoggerService.error("Impossible de récupérer une anecdote depuis le web");
@@ -104,7 +105,8 @@ export class AnecdoteService {
           }
 
           const content = channelConfig.roleId ? `<@&${channelConfig.roleId}>` : undefined;
-          await channel.send({ content, embeds: [embed] });
+          const sent = await channel.send({ content, embeds: [embed] });
+          await this.trackSentMessage(sent, guildId, anecdote.title, settings.language);
           await LoggerService.success(`Anecdote envoyée à #${channel.name}`);
         } catch (error) {
           await LoggerService.error(`Erreur lors de l'envoi au channel ${channelConfig.channelId}: ${error}`);
@@ -135,8 +137,8 @@ export class AnecdoteService {
         return false;
       }
 
-      const language = await GuildSettingsService.getLanguage(guildId);
-      const anecdote = await this.fetchAnecdoteFromWeb(guildId, language);
+      const settings = await GuildSettingsService.get(guildId);
+      const anecdote = await this.fetchAnecdoteFromWeb(guildId, settings.language, this.buildThemesContext(settings.themes));
 
       if (!anecdote) {
         await LoggerService.error("Impossible de récupérer une anecdote depuis le web");
@@ -149,10 +151,11 @@ export class AnecdoteService {
       const embed = this.createAnecdoteEmbed(anecdote);
       const content = roleId ? `<@&${roleId}>` : undefined;
 
-      await channel.send({
+      const sent = await channel.send({
         content,
         embeds: [embed]
       });
+      await this.trackSentMessage(sent, guildId, anecdote.title, settings.language);
 
       await LoggerService.success(`Anecdote envoyée manuellement à #${channel.name}`);
       return true;
@@ -183,6 +186,75 @@ export class AnecdoteService {
     return prisma.sentAnecdote.count();
   }
 
+  /**
+   * Page d'historique des anecdotes envoyées sur un serveur (la plus récente
+   * en premier), avec compteurs de votes.
+   */
+  public static async getHistoryPage(guildId: string, page: number, pageSize = 5): Promise<{
+    items: { title: string; sentAt: Date; upvotes: number; downvotes: number }[];
+    total: number;
+    pages: number;
+    page: number;
+  }> {
+    const total = await prisma.anecdoteMessage.count({ where: { guildId } });
+    const pages = Math.max(1, Math.ceil(total / pageSize));
+    const current = Math.min(Math.max(0, page), pages - 1);
+
+    const items = await prisma.anecdoteMessage.findMany({
+      where: { guildId },
+      orderBy: { sentAt: "desc" },
+      skip: current * pageSize,
+      take: pageSize,
+      select: { title: true, sentAt: true, upvotes: true, downvotes: true },
+    });
+
+    return { items, total, pages, page: current };
+  }
+
+  /**
+   * Construit l'embed d'une anecdote sur un sujet imposé (commande à la demande).
+   */
+  public static async buildAboutEmbed(topic: string, language: Language): Promise<{ embed: EmbedBuilder; title: string } | null> {
+    const result = await GeminiService.generateAnecdoteAbout(topic, language);
+    if (!result) {
+      return null;
+    }
+
+    const anecdote: Anecdote = {
+      title: `🤖 ${result.title}`,
+      paragraphs: result.paragraphs,
+      sources: [
+        { name: this.AI_SOURCE_NAME[language], url: "https://ai.google.dev/gemini-api" },
+        ...result.sources,
+      ],
+    };
+
+    return { embed: this.createAnecdoteEmbed(anecdote), title: anecdote.title };
+  }
+
+  /**
+   * Enregistre un message d'anecdote envoyé (pour l'historique et les votes)
+   * et ajoute les réactions 👍 / 👎.
+   */
+  public static async trackSentMessage(message: Message, guildId: string, title: string, language: Language): Promise<void> {
+    try {
+      const cleanTitle = title.replace(/^[^\w\s]+\s*/, "").trim();
+      await prisma.anecdoteMessage.create({
+        data: {
+          guildId,
+          channelId: message.channelId,
+          messageId: message.id,
+          title: cleanTitle,
+          language,
+        },
+      });
+      await message.react("👍");
+      await message.react("👎");
+    } catch (error) {
+      await LoggerService.error(`Erreur lors du suivi de l'anecdote (${message.id}): ${error}`);
+    }
+  }
+
   /** Libellé de la source "généré par IA" selon la langue du serveur. */
   private static readonly AI_SOURCE_NAME: Record<Language, string> = {
     fr: "Généré par IA (Gemini)",
@@ -192,12 +264,21 @@ export class AnecdoteService {
     it: "Generato da IA (Gemini)",
   };
 
-  private static async fetchAnecdoteFromWeb(guildId: string, language: Language): Promise<Anecdote | null> {
+  /** Construit la directive de thèmes pour le prompt Gemini (libellés en français). */
+  public static buildThemesContext(themes: Theme[]): string {
+    if (themes.length === 0) {
+      return "";
+    }
+    const labels = themes.map((theme) => themeLabel("fr", theme)).join(", ");
+    return `\n\nTHÈMES IMPOSÉS : concentre-toi exclusivement sur ces thèmes : ${labels}.`;
+  }
+
+  private static async fetchAnecdoteFromWeb(guildId: string, language: Language, themesContext = ""): Promise<Anecdote | null> {
     try {
       await LoggerService.info(`🤖 Tentative de génération d'anecdote via Gemini (${language})...`);
 
       // Essayer d'abord avec Gemini (filtre les anecdotes déjà envoyées sur ce serveur)
-      const geminiResult = await GeminiService.generateTechAnecdote(guildId, language);
+      const geminiResult = await GeminiService.generateTechAnecdote(guildId, language, themesContext);
 
       if (geminiResult) {
         await LoggerService.success(`Anecdote générée avec succès via Gemini`);

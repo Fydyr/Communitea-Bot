@@ -46,4 +46,46 @@ export const de: Record<MessageKey, string> = {
   "timezone.success": "✅ Zeitzone auf `{timezone}` gesetzt.",
 
   "language.success": "✅ Sprache auf **{language}** gesetzt.",
+
+  "translate.title": "🌍 Übersetzung auf {language}",
+  "translate.footer": "Automatisch übersetzt",
+
+  "about.failed": "❌ Zu diesem Thema konnte keine Anekdote erstellt werden. Versuche es später erneut.",
+
+  "theme.langages": "Programmiersprachen",
+  "theme.entreprises": "Tech-Unternehmen",
+  "theme.personnalites": "Tech-Persönlichkeiten",
+  "theme.jeux-video": "Videospiele",
+  "theme.securite": "Cybersicherheit",
+  "theme.hardware": "Computer-Hardware",
+  "theme.web": "Web und Internet",
+  "theme.ia": "Künstliche Intelligenz",
+  "theme.histoire": "Geschichte der Informatik",
+
+  "themeAdd.invalid": "❌ Unbekanntes Thema.",
+  "themeAdd.exists": "⚠️ Das Thema **{theme}** ist bereits aktiv.",
+  "themeAdd.added": "✅ Thema **{theme}** hinzugefügt. Aktive Themen: {themes}.",
+  "themeRemove.notPresent": "⚠️ Das Thema **{theme}** ist nicht aktiv.",
+  "themeRemove.removed": "✅ Thema **{theme}** entfernt. Aktive Themen: {themes}.",
+
+  "schedule.themes": "🏷️ Themen",
+  "schedule.allThemes": "Alle",
+  "schedule.quizHours": "🧠 Geplante Quiz",
+
+  "quiz.title": "🧠 Quiz",
+  "quiz.footer": "Du hast 2 Minuten zum Antworten",
+  "quiz.correct": "✅ Richtig! {explanation}",
+  "quiz.incorrect": "❌ Falsche Antwort. Die richtige Antwort war: **{answer}**.\n{explanation}",
+  "quiz.reveal": "✅ Antwort: **{answer}**",
+  "quiz.failed": "❌ Quiz konnte nicht erstellt werden. Versuche es später erneut.",
+
+  "quizHour.exists": "⚠️ Die Quiz-Uhrzeit {hour}:00 Uhr ist bereits konfiguriert.",
+  "quizHour.added": "✅ Quiz-Uhrzeit {hour}:00 Uhr hinzugefügt. Geplante Quiz: {hours}.",
+  "quizHour.notPresent": "⚠️ Die Quiz-Uhrzeit {hour}:00 Uhr ist nicht konfiguriert.",
+  "quizHour.removed": "✅ Quiz-Uhrzeit {hour}:00 Uhr entfernt. Geplante Quiz: {hours}.",
+  "quizHour.emptied": "✅ Quiz-Uhrzeit {hour}:00 Uhr entfernt. Keine geplanten Quiz mehr.",
+
+  "history.title": "📜 Anekdoten-Verlauf",
+  "history.empty": "📭 Auf diesem Server wurde noch keine Anekdote gesendet.",
+  "history.footer": "Seite {page}/{pages} · {total} Anekdote(n)",
 };

@@ -1,12 +1,14 @@
 import "reflect-metadata";
-import { IntentsBitField } from "discord.js";
+import { IntentsBitField, Partials } from "discord.js";
 import { Client } from "discordx";
 import { config } from "./config";
 import path from "path";
 import { globSync } from "glob";
 import cron from "node-cron";
 import { AnecdoteService } from "./services/AnecdoteService";
+import { QuizService } from "./services/QuizService";
 import { LoggerService } from "./services/LoggerService";
+import { registerReactionListeners } from "./listeners/reactions";
 
 export const bot = new Client({
   intents: [
@@ -14,9 +16,14 @@ export const bot = new Client({
     IntentsBitField.Flags.GuildMembers,
     IntentsBitField.Flags.GuildMessages,
     IntentsBitField.Flags.MessageContent,
+    IntentsBitField.Flags.GuildMessageReactions,
   ],
+  // Partials nécessaires pour recevoir les réactions sur des messages non mis en cache.
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User],
   silent: false,
 });
+
+registerReactionListeners(bot);
 
 bot.once("clientReady", async () => {
   await bot.clearApplicationCommands();
@@ -28,9 +35,10 @@ bot.once("clientReady", async () => {
   // d'envoi configurées. Les horaires/fuseaux sont définis par serveur.
   cron.schedule("0 * * * *", async () => {
     await AnecdoteService.sendScheduledAnecdotes();
+    await QuizService.sendScheduledQuizzes();
   }, { timezone: "UTC" });
 
-  await LoggerService.info("📅 Planificateur d'anecdotes activé (horaires et fuseaux configurables par serveur)");
+  await LoggerService.info("📅 Planificateur d'anecdotes et de quiz activé (horaires et fuseaux configurables par serveur)");
 });
 
 bot.on("interactionCreate", async (interaction) => {

@@ -1,4 +1,4 @@
-import { DEFAULT_LANGUAGE, type Language } from "../services/GuildSettingsService";
+import { DEFAULT_LANGUAGE, type Language, type Theme } from "../services/GuildSettingsService";
 import { fr, type MessageKey } from "./locales/fr";
 import { en } from "./locales/en";
 import { es } from "./locales/es";
@@ -37,4 +37,9 @@ export function t(
   }
 
   return template;
+}
+
+/** Libellé localisé d'un thème (ex. "Jeux vidéo"). */
+export function themeLabel(lang: Language, theme: Theme): string {
+  return t(lang, `theme.${theme}` as MessageKey);
 }
