@@ -16,7 +16,7 @@ import { GeminiService, type QuizData } from "./GeminiService";
 import { LoggerService } from "./LoggerService";
 import { t } from "../i18n";
 
-const COLLECTOR_MS = 120_000;
+const COLLECTOR_MS = 60_000;
 
 export class QuizService {
   /** Génère un quiz pour un serveur (langue + thèmes pris en compte). */
@@ -97,7 +97,8 @@ export class QuizService {
         const base = message.embeds[0]
           ? EmbedBuilder.from(message.embeds[0])
           : new EmbedBuilder().setTitle(t(lang, "quiz.title"));
-        base.addFields({ name: "​", value: t(lang, "quiz.reveal", { answer: quiz.options[quiz.correctIndex] }) });
+        const reveal = `${t(lang, "quiz.reveal", { answer: quiz.options[quiz.correctIndex] })}\n${quiz.explanation}`;
+        base.addFields({ name: "​", value: reveal.slice(0, 1024) });
         await message.edit({ embeds: [base], components: this.disabledComponents(quiz) });
       } catch {
         // message supprimé ou non éditable : on ignore

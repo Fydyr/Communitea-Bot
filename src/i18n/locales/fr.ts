@@ -71,7 +71,7 @@ export const fr = {
   "schedule.quizHours": "🧠 Quiz programmés",
 
   "quiz.title": "🧠 Quiz",
-  "quiz.footer": "Tu as 2 minutes pour répondre",
+  "quiz.footer": "Tu as 1 minute pour répondre",
   "quiz.correct": "✅ Bonne réponse ! {explanation}",
   "quiz.incorrect": "❌ Mauvaise réponse. La bonne réponse était : **{answer}**.\n{explanation}",
   "quiz.reveal": "✅ Réponse : **{answer}**",
