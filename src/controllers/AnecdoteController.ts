@@ -342,7 +342,8 @@ export class AnecdoteController {
         return;
       }
 
-      await interaction.editReply({ embeds: [result.embed] });
+      const components = interaction.guildId ? AnecdoteService.voteComponents() : [];
+      await interaction.editReply({ embeds: [result.embed], components });
 
       if (interaction.guildId) {
         const message = await interaction.fetchReply();
@@ -815,6 +816,34 @@ export class AnecdoteController {
     } catch (error) {
       await LoggerService.error(`Erreur /anecdote-history: ${error}`);
       await interaction.editReply(t(lang, "common.error"));
+    }
+  }
+
+  @ButtonComponent({ id: "vote:up" })
+  async voteUp(interaction: ButtonInteraction): Promise<void> {
+    await this.handleVote(interaction, 1);
+  }
+
+  @ButtonComponent({ id: "vote:down" })
+  async voteDown(interaction: ButtonInteraction): Promise<void> {
+    await this.handleVote(interaction, -1);
+  }
+
+  private async handleVote(interaction: ButtonInteraction, value: 1 | -1): Promise<void> {
+    try {
+      const result = await AnecdoteService.applyVote(interaction.message.id, interaction.user.id, value);
+      if (!result) {
+        await interaction.deferUpdate();
+        return;
+      }
+      await interaction.update({ components: AnecdoteService.voteComponents(result.upvotes, result.downvotes) });
+    } catch (error) {
+      await LoggerService.error(`Erreur lors d'un vote: ${error}`);
+      try {
+        await interaction.deferUpdate();
+      } catch {
+        // interaction déjà traitée
+      }
     }
   }
 

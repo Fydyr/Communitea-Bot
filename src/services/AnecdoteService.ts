@@ -1,4 +1,4 @@
-import { TextChannel, EmbedBuilder, NewsChannel, Message } from "discord.js";
+import { TextChannel, EmbedBuilder, NewsChannel, Message, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { bot } from "../index";
 import axios from "axios";
 import { LoggerService } from "./LoggerService";
@@ -105,7 +105,7 @@ export class AnecdoteService {
           }
 
           const content = channelConfig.roleId ? `<@&${channelConfig.roleId}>` : undefined;
-          const sent = await channel.send({ content, embeds: [embed] });
+          const sent = await channel.send({ content, embeds: [embed], components: this.voteComponents() });
           await this.trackSentMessage(sent, guildId, anecdote.title, settings.language);
           await LoggerService.success(`Anecdote envoyée à #${channel.name}`);
         } catch (error) {
@@ -153,7 +153,8 @@ export class AnecdoteService {
 
       const sent = await channel.send({
         content,
-        embeds: [embed]
+        embeds: [embed],
+        components: this.voteComponents()
       });
       await this.trackSentMessage(sent, guildId, anecdote.title, settings.language);
 
@@ -232,9 +233,30 @@ export class AnecdoteService {
     return { embed: this.createAnecdoteEmbed(anecdote), title: anecdote.title };
   }
 
+  /** Identifiants des boutons de vote (statiques : le message ciblé est déduit du clic). */
+  public static readonly VOTE_UP_ID = "vote:up";
+  public static readonly VOTE_DOWN_ID = "vote:down";
+
+  /** Construit la rangée de boutons de vote 👍 / 👎 avec leurs compteurs. */
+  public static voteComponents(upvotes = 0, downvotes = 0): ActionRowBuilder<ButtonBuilder>[] {
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(this.VOTE_UP_ID)
+        .setEmoji("👍")
+        .setLabel(String(upvotes))
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(this.VOTE_DOWN_ID)
+        .setEmoji("👎")
+        .setLabel(String(downvotes))
+        .setStyle(ButtonStyle.Danger)
+    );
+    return [row];
+  }
+
   /**
-   * Enregistre un message d'anecdote envoyé (pour l'historique et les votes)
-   * et ajoute les réactions 👍 / 👎.
+   * Enregistre un message d'anecdote envoyé (pour l'historique et les votes).
+   * Les boutons de vote sont attachés à l'envoi par les appelants.
    */
   public static async trackSentMessage(message: Message, guildId: string, title: string, language: Language): Promise<void> {
     try {
@@ -248,11 +270,43 @@ export class AnecdoteService {
           language,
         },
       });
-      await message.react("👍");
-      await message.react("👎");
     } catch (error) {
       await LoggerService.error(`Erreur lors du suivi de l'anecdote (${message.id}): ${error}`);
     }
+  }
+
+  /**
+   * Applique le vote d'un utilisateur (👍 = 1, 👎 = -1) sur une anecdote suivie,
+   * avec bascule si l'utilisateur reclique le même vote. Renvoie les compteurs
+   * à jour, ou null si le message n'est pas une anecdote suivie.
+   */
+  public static async applyVote(messageId: string, userId: string, value: 1 | -1): Promise<{ upvotes: number; downvotes: number } | null> {
+    const tracked = await prisma.anecdoteMessage.findUnique({ where: { messageId } });
+    if (!tracked) {
+      return null;
+    }
+
+    const existing = await prisma.anecdoteVote.findUnique({
+      where: { messageId_userId: { messageId, userId } },
+    });
+
+    if (!existing) {
+      await prisma.anecdoteVote.create({ data: { messageId, userId, value } });
+    } else if (existing.value === value) {
+      await prisma.anecdoteVote.delete({ where: { id: existing.id } });
+    } else {
+      await prisma.anecdoteVote.update({ where: { id: existing.id }, data: { value } });
+    }
+
+    const upvotes = await prisma.anecdoteVote.count({ where: { messageId, value: 1 } });
+    const downvotes = await prisma.anecdoteVote.count({ where: { messageId, value: -1 } });
+
+    await prisma.anecdoteMessage.update({
+      where: { messageId },
+      data: { upvotes, downvotes },
+    });
+
+    return { upvotes, downvotes };
   }
 
   /** Libellé de la source "généré par IA" selon la langue du serveur. */
