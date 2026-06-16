@@ -12,7 +12,9 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ApplicationCommandOptionType
+  ApplicationCommandOptionType,
+  ApplicationIntegrationType,
+  InteractionContextType
 } from "discord.js";
 import { AnecdoteService } from "../services/AnecdoteService";
 import { QuizService } from "../services/QuizService";
@@ -32,6 +34,15 @@ import { config } from "../config";
 async function langOf(guildId: string | null): Promise<Language> {
   return guildId ? GuildSettingsService.getLanguage(guildId) : DEFAULT_LANGUAGE;
 }
+
+/**
+ * Options rendant une commande utilisable en tant qu'application installée sur
+ * un compte utilisateur (MP et n'importe quel serveur), en plus de l'install serveur.
+ */
+const USER_APP = {
+  integrationTypes: [ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall],
+  contexts: [InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel],
+};
 
 /** Formate une liste d'heures pour l'affichage selon la langue. */
 function formatHours(hours: number[], lang: Language, emptyLabel?: string): string {
@@ -322,7 +333,8 @@ export class AnecdoteController {
 
   @Slash({
     name: "anecdote-about",
-    description: "Génère une anecdote sur un sujet précis"
+    description: "Génère une anecdote sur un sujet précis",
+    ...USER_APP
   })
   async anecdoteAbout(
     @SlashOption({
@@ -678,19 +690,17 @@ export class AnecdoteController {
 
   @Slash({
     name: "quiz",
-    description: "Lance un quiz tech interactif"
+    description: "Lance un quiz tech interactif",
+    ...USER_APP
   })
   async quiz(interaction: CommandInteraction): Promise<void> {
     await interaction.deferReply();
     const lang = await langOf(interaction.guildId);
 
     try {
-      if (!interaction.guildId) {
-        await interaction.editReply(t(lang, "common.notInGuild"));
-        return;
-      }
-
-      const generated = await QuizService.generateForGuild(interaction.guildId);
+      const generated = interaction.guildId
+        ? await QuizService.generateForGuild(interaction.guildId)
+        : await QuizService.generate(DEFAULT_LANGUAGE);
       if (!generated) {
         await interaction.editReply(t(lang, "quiz.failed"));
         return;

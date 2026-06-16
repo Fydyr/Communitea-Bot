@@ -20,15 +20,19 @@ import { t } from "../i18n";
 const COLLECTOR_MS = 60_000;
 
 export class QuizService {
-  /** Génère un quiz pour un serveur (langue + thèmes pris en compte). */
-  public static async generateForGuild(guildId: string): Promise<{ quiz: QuizData; lang: Language } | null> {
-    const settings = await GuildSettingsService.get(guildId);
-    const themesContext = AnecdoteService.buildThemesContext(settings.themes);
-    const quiz = await GeminiService.generateQuiz(settings.language, themesContext);
+  /** Génère un quiz dans une langue donnée (thèmes optionnels). */
+  public static async generate(language: Language, themesContext = ""): Promise<{ quiz: QuizData; lang: Language } | null> {
+    const quiz = await GeminiService.generateQuiz(language, themesContext);
     if (!quiz) {
       return null;
     }
-    return { quiz, lang: settings.language };
+    return { quiz, lang: language };
+  }
+
+  /** Génère un quiz pour un serveur (langue + thèmes pris en compte). */
+  public static async generateForGuild(guildId: string): Promise<{ quiz: QuizData; lang: Language } | null> {
+    const settings = await GuildSettingsService.get(guildId);
+    return this.generate(settings.language, AnecdoteService.buildThemesContext(settings.themes));
   }
 
   /** Embed + boutons (actifs) pour un quiz. */
