@@ -88,4 +88,21 @@ export const de: Record<MessageKey, string> = {
   "history.title": "📜 Anekdoten-Verlauf",
   "history.empty": "📭 Auf diesem Server wurde noch keine Anekdote gesendet.",
   "history.footer": "Seite {page}/{pages} · {total} Anekdote(n)",
+
+  "level.up": "🎉 <@{user}> erreicht Level **{level}**!",
+  "level.title": "📊 Statistiken von {user}",
+  "level.level": "🏆 Level",
+  "level.xp": "✨ XP",
+  "level.quiz": "🧠 Quiz (richtig / beantwortet)",
+  "level.notInGuild": "❌ Level sind nur auf einem Server verfügbar.",
+
+  "leaderboard.xpTitle": "🏆 XP-Rangliste",
+  "leaderboard.quizTitle": "🧠 Quiz-Rangliste",
+  "leaderboard.empty": "Auf diesem Server hat noch niemand XP gesammelt.",
+  "leaderboard.quizEmpty": "Auf diesem Server hat noch niemand ein Quiz beantwortet.",
+  "leaderboard.xpLine": "**{rank}.** <@{user}> · Level {level} ({xp} XP)",
+  "leaderboard.quizLine": "**{rank}.** <@{user}> · {correct} richtig / {answered}",
+
+  "recap.title": "🏆 Anekdote der Woche",
+  "recap.description": "Die beliebteste Anekdote der letzten 7 Tage ({up} 👍 / {down} 👎):\n\n**{title}**\n[Nachricht ansehen]({url})",
 };

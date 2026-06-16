@@ -65,3 +65,29 @@ model AnecdoteVote {
   @@unique([messageId, userId])
   @@index([messageId])
 }
+
+model UserStats {
+  id           String   @id @default(cuid())
+  guildId      String
+  userId       String
+  xp           Int      @default(0)
+  level        Int      @default(0)
+  quizAnswered Int      @default(0)
+  quizCorrect  Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([guildId, userId])
+  @@index([guildId])
+}
+
+model XpEvent {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  source    String
+  refId     String
+  amount    Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, source, refId])
+}

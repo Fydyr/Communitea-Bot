@@ -36,6 +36,7 @@ bot.once("clientReady", async () => {
   cron.schedule("0 * * * *", async () => {
     await AnecdoteService.sendScheduledAnecdotes();
     await QuizService.sendScheduledQuizzes();
+    await AnecdoteService.sendWeeklyRecaps();
   }, { timezone: "UTC" });
 
   await LoggerService.info("📅 Planificateur d'anecdotes et de quiz activé (horaires et fuseaux configurables par serveur)");

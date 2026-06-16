@@ -7,6 +7,7 @@ import {
   TextChannel,
   NewsChannel,
   Role,
+  User,
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
@@ -15,6 +16,7 @@ import {
 } from "discord.js";
 import { AnecdoteService } from "../services/AnecdoteService";
 import { QuizService } from "../services/QuizService";
+import { LevelService } from "../services/LevelService";
 import { LoggerService } from "../services/LoggerService";
 import {
   GuildSettingsService,
@@ -819,6 +821,125 @@ export class AnecdoteController {
     }
   }
 
+  @Slash({
+    name: "level",
+    description: "Affiche le niveau et l'XP d'un membre"
+  })
+  async level(
+    @SlashOption({
+      name: "membre",
+      description: "Le membre à consulter (toi par défaut)",
+      required: false,
+      type: ApplicationCommandOptionType.User
+    })
+    member: User | null,
+    interaction: CommandInteraction
+  ): Promise<void> {
+    await interaction.deferReply();
+    const lang = await langOf(interaction.guildId);
+
+    try {
+      if (!interaction.guildId) {
+        await interaction.editReply(t(lang, "level.notInGuild"));
+        return;
+      }
+
+      const target = member ?? interaction.user;
+      const stats = await LevelService.getStats(interaction.guildId, target.id);
+      const nextLevelXp = LevelService.xpForLevel(stats.level + 1);
+
+      const embed = new EmbedBuilder()
+        .setTitle(t(lang, "level.title", { user: target.username }))
+        .setColor(0x5865F2)
+        .setThumbnail(target.displayAvatarURL())
+        .addFields(
+          { name: t(lang, "level.level"), value: `${stats.level}`, inline: true },
+          { name: t(lang, "level.xp"), value: `${stats.xp} / ${nextLevelXp}`, inline: true },
+          { name: t(lang, "level.quiz"), value: `${stats.quizCorrect} / ${stats.quizAnswered}`, inline: true }
+        )
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      await LoggerService.error(`Erreur /level: ${error}`);
+      await interaction.editReply(t(lang, "common.error"));
+    }
+  }
+
+  @Slash({
+    name: "leaderboard",
+    description: "Classement XP du serveur"
+  })
+  async leaderboard(interaction: CommandInteraction): Promise<void> {
+    await interaction.deferReply();
+    const lang = await langOf(interaction.guildId);
+
+    try {
+      if (!interaction.guildId) {
+        await interaction.editReply(t(lang, "level.notInGuild"));
+        return;
+      }
+
+      const entries = await LevelService.xpLeaderboard(interaction.guildId, 10);
+      if (entries.length === 0) {
+        await interaction.editReply(t(lang, "leaderboard.empty"));
+        return;
+      }
+
+      const lines = entries.map((entry, index) =>
+        t(lang, "leaderboard.xpLine", { rank: index + 1, user: entry.userId, level: entry.level, xp: entry.xp })
+      );
+
+      const embed = new EmbedBuilder()
+        .setTitle(t(lang, "leaderboard.xpTitle"))
+        .setColor(0x5865F2)
+        .setDescription(lines.join("\n"))
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      await LoggerService.error(`Erreur /leaderboard: ${error}`);
+      await interaction.editReply(t(lang, "common.error"));
+    }
+  }
+
+  @Slash({
+    name: "quiz-leaderboard",
+    description: "Classement des bonnes réponses au quiz"
+  })
+  async quizLeaderboard(interaction: CommandInteraction): Promise<void> {
+    await interaction.deferReply();
+    const lang = await langOf(interaction.guildId);
+
+    try {
+      if (!interaction.guildId) {
+        await interaction.editReply(t(lang, "level.notInGuild"));
+        return;
+      }
+
+      const entries = await LevelService.quizLeaderboard(interaction.guildId, 10);
+      if (entries.length === 0) {
+        await interaction.editReply(t(lang, "leaderboard.quizEmpty"));
+        return;
+      }
+
+      const lines = entries.map((entry, index) =>
+        t(lang, "leaderboard.quizLine", { rank: index + 1, user: entry.userId, correct: entry.quizCorrect, answered: entry.quizAnswered })
+      );
+
+      const embed = new EmbedBuilder()
+        .setTitle(t(lang, "leaderboard.quizTitle"))
+        .setColor(0x5865F2)
+        .setDescription(lines.join("\n"))
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      await LoggerService.error(`Erreur /quiz-leaderboard: ${error}`);
+      await interaction.editReply(t(lang, "common.error"));
+    }
+  }
+
   @ButtonComponent({ id: "vote:up" })
   async voteUp(interaction: ButtonInteraction): Promise<void> {
     await this.handleVote(interaction, 1);
@@ -837,6 +958,14 @@ export class AnecdoteController {
         return;
       }
       await interaction.update({ components: AnecdoteService.voteComponents(result.upvotes, result.downvotes) });
+
+      if (interaction.guildId) {
+        const award = await LevelService.award(interaction.guildId, interaction.user.id, "vote", interaction.message.id);
+        if (award?.leveledUp) {
+          const lang = await langOf(interaction.guildId);
+          await interaction.followUp({ content: t(lang, "level.up", { user: interaction.user.id, level: award.level }) });
+        }
+      }
     } catch (error) {
       await LoggerService.error(`Erreur lors d'un vote: ${error}`);
       try {

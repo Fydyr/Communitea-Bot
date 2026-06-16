@@ -13,6 +13,7 @@ import { prisma } from "../lib/prisma";
 import { GuildSettingsService, type Language } from "./GuildSettingsService";
 import { AnecdoteService } from "./AnecdoteService";
 import { GeminiService, type QuizData } from "./GeminiService";
+import { LevelService } from "./LevelService";
 import { LoggerService } from "./LoggerService";
 import { t } from "../i18n";
 
@@ -82,10 +83,19 @@ export class QuizService {
       try {
         const index = parseInt(interaction.customId.split("_")[1] ?? "-1", 10);
         const answer = quiz.options[quiz.correctIndex];
-        if (index === quiz.correctIndex) {
+        const correct = index === quiz.correctIndex;
+
+        if (correct) {
           await interaction.reply({ content: t(lang, "quiz.correct", { explanation: quiz.explanation }), flags: 64 });
         } else {
           await interaction.reply({ content: t(lang, "quiz.incorrect", { answer, explanation: quiz.explanation }), flags: 64 });
+        }
+
+        if (message.guildId) {
+          const award = await LevelService.award(message.guildId, interaction.user.id, "quiz", message.id, { correct });
+          if (award?.leveledUp && message.channel.isTextBased() && !message.channel.isDMBased()) {
+            await (message.channel as TextChannel).send(t(lang, "level.up", { user: interaction.user.id, level: award.level }));
+          }
         }
       } catch (error) {
         await LoggerService.error(`Erreur lors d'une réponse au quiz: ${error}`);

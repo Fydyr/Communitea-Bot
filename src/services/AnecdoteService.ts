@@ -6,7 +6,7 @@ import { GeminiService } from "./GeminiService";
 import { prisma } from "../lib/prisma";
 import { GuildSettingsService, type Language, type Theme } from "./GuildSettingsService";
 import { TECH_TOPICS_BY_LANG } from "./techTopics";
-import { themeLabel } from "../i18n";
+import { t, themeLabel } from "../i18n";
 
 interface Anecdote {
   title: string;
@@ -27,6 +27,18 @@ export class AnecdoteService {
     }).format(new Date());
     // "24" est renvoyé par certains environnements à minuit : on le ramène à 0.
     return parseInt(formatted, 10) % 24;
+  }
+
+  /**
+   * Renvoie le jour de la semaine (0 = dimanche … 6 = samedi) dans un fuseau.
+   */
+  public static getCurrentWeekdayInTimezone(timezone: string): number {
+    const weekday = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      weekday: "long",
+    }).format(new Date());
+    const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    return days.indexOf(weekday.toLowerCase());
   }
 
   /**
@@ -63,6 +75,81 @@ export class AnecdoteService {
       }
     } catch (error) {
       await LoggerService.error(`Erreur lors de l'évaluation des envois programmés: ${error}`);
+    }
+  }
+
+  /**
+   * Récap hebdomadaire : chaque dimanche à 20h (heure du serveur), poste
+   * l'anecdote la plus appréciée des 7 derniers jours dans les salons du serveur.
+   * Appelé par le cron horaire.
+   */
+  public static async sendWeeklyRecaps(): Promise<void> {
+    try {
+      const rows = await prisma.anecdoteChannel.findMany({
+        distinct: ["guildId"],
+        select: { guildId: true },
+      });
+
+      for (const { guildId } of rows) {
+        try {
+          const settings = await GuildSettingsService.get(guildId);
+          const hour = this.getCurrentHourInTimezone(settings.timezone);
+          const weekday = this.getCurrentWeekdayInTimezone(settings.timezone);
+
+          // Dimanche (0) à 20h
+          if (weekday !== 0 || hour !== 20) {
+            continue;
+          }
+
+          const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          const candidates = await prisma.anecdoteMessage.findMany({
+            where: { guildId, sentAt: { gte: since } },
+          });
+
+          if (candidates.length === 0) {
+            continue;
+          }
+
+          const top = candidates.reduce((best, current) =>
+            current.upvotes - current.downvotes > best.upvotes - best.downvotes ? current : best
+          );
+
+          if (top.upvotes === 0) {
+            continue;
+          }
+
+          const url = `https://discord.com/channels/${guildId}/${top.channelId}/${top.messageId}`;
+          const embed = new EmbedBuilder()
+            .setTitle(t(settings.language, "recap.title"))
+            .setColor(0xFFD700)
+            .setDescription(
+              t(settings.language, "recap.description", {
+                up: top.upvotes,
+                down: top.downvotes,
+                title: top.title,
+                url,
+              })
+            )
+            .setTimestamp();
+
+          const channels = await prisma.anecdoteChannel.findMany({ where: { guildId } });
+          for (const channelConfig of channels) {
+            try {
+              const channel = await bot.channels.fetch(channelConfig.channelId);
+              if (channel instanceof TextChannel || channel instanceof NewsChannel) {
+                await channel.send({ embeds: [embed] });
+              }
+            } catch (error) {
+              await LoggerService.error(`Erreur récap au salon ${channelConfig.channelId}: ${error}`);
+            }
+          }
+          await LoggerService.success(`Récap hebdo envoyé au serveur ${guildId}`);
+        } catch (error) {
+          await LoggerService.error(`Erreur lors du récap hebdo du serveur ${guildId}: ${error}`);
+        }
+      }
+    } catch (error) {
+      await LoggerService.error(`Erreur lors de l'évaluation des récaps hebdo: ${error}`);
     }
   }
 

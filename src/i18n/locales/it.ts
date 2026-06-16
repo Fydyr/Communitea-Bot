@@ -88,4 +88,21 @@ export const it: Record<MessageKey, string> = {
   "history.title": "📜 Cronologia degli aneddoti",
   "history.empty": "📭 Nessun aneddoto è ancora stato inviato su questo server.",
   "history.footer": "Pagina {page}/{pages} · {total} aneddoto/i",
+
+  "level.up": "🎉 <@{user}> sale al livello **{level}**!",
+  "level.title": "📊 Statistiche di {user}",
+  "level.level": "🏆 Livello",
+  "level.xp": "✨ XP",
+  "level.quiz": "🧠 Quiz (corrette / risposte)",
+  "level.notInGuild": "❌ I livelli sono disponibili solo in un server.",
+
+  "leaderboard.xpTitle": "🏆 Classifica XP",
+  "leaderboard.quizTitle": "🧠 Classifica Quiz",
+  "leaderboard.empty": "Nessuno ha ancora guadagnato XP in questo server.",
+  "leaderboard.quizEmpty": "Nessuno ha ancora risposto a un quiz in questo server.",
+  "leaderboard.xpLine": "**{rank}.** <@{user}> · livello {level} ({xp} XP)",
+  "leaderboard.quizLine": "**{rank}.** <@{user}> · {correct} corrette / {answered}",
+
+  "recap.title": "🏆 Aneddoto della settimana",
+  "recap.description": "L'aneddoto più apprezzato degli ultimi 7 giorni ({up} 👍 / {down} 👎):\n\n**{title}**\n[Vedi il messaggio]({url})",
 };

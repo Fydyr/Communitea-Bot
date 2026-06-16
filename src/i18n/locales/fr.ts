@@ -86,6 +86,23 @@ export const fr = {
   "history.title": "📜 Historique des anecdotes",
   "history.empty": "📭 Aucune anecdote n'a encore été envoyée sur ce serveur.",
   "history.footer": "Page {page}/{pages} · {total} anecdote(s)",
+
+  "level.up": "🎉 <@{user}> passe au niveau **{level}** !",
+  "level.title": "📊 Statistiques de {user}",
+  "level.level": "🏆 Niveau",
+  "level.xp": "✨ XP",
+  "level.quiz": "🧠 Quiz (corrects / répondus)",
+  "level.notInGuild": "❌ Les niveaux ne sont disponibles que sur un serveur.",
+
+  "leaderboard.xpTitle": "🏆 Classement XP",
+  "leaderboard.quizTitle": "🧠 Classement Quiz",
+  "leaderboard.empty": "Personne n'a encore gagné d'XP sur ce serveur.",
+  "leaderboard.quizEmpty": "Personne n'a encore répondu à un quiz sur ce serveur.",
+  "leaderboard.xpLine": "**{rank}.** <@{user}> · niveau {level} ({xp} XP)",
+  "leaderboard.quizLine": "**{rank}.** <@{user}> · {correct} bonnes réponses / {answered}",
+
+  "recap.title": "🏆 Anecdote de la semaine",
+  "recap.description": "L'anecdote la plus appréciée des 7 derniers jours ({up} 👍 / {down} 👎) :\n\n**{title}**\n[Voir le message]({url})",
 } as const;
 
 export type MessageKey = keyof typeof fr;
