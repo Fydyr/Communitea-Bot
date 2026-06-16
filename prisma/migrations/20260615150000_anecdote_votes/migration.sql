@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "AnecdoteVote" (
+CREATE TABLE IF NOT EXISTS "AnecdoteVote" (
     "id" TEXT NOT NULL,
     "messageId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE "AnecdoteVote" (
 );
 
 -- CreateIndex
-CREATE INDEX "AnecdoteVote_messageId_idx" ON "AnecdoteVote"("messageId");
+CREATE INDEX IF NOT EXISTS "AnecdoteVote_messageId_idx" ON "AnecdoteVote"("messageId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "AnecdoteVote_messageId_userId_key" ON "AnecdoteVote"("messageId", "userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "AnecdoteVote_messageId_userId_key" ON "AnecdoteVote"("messageId", "userId");

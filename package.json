@@ -22,7 +22,7 @@
     "prisma:push": "node scripts/prisma-env.js db push",
     "prisma:pull": "node scripts/prisma-env.js db pull",
     "prisma:migrate": "node scripts/prisma-env.js migrate dev",
-    "prisma:migrate:prod": "node scripts/prisma-env.js migrate deploy",
+    "prisma:migrate:prod": "node scripts/migrate-deploy.js",
     "prisma:studio": "node scripts/prisma-env.js studio",
     "prisma:reset": "node scripts/prisma-env.js migrate reset",
     "test": "echo \"Error: no test specified\" && exit 1"
