@@ -18,6 +18,7 @@ import { LoggerService } from "./LoggerService";
 import { t } from "../i18n";
 
 const COLLECTOR_MS = 60_000;
+const OPTION_LETTERS = ["A", "B", "C", "D"];
 
 export class QuizService {
   /** Génère un quiz dans une langue donnée (thèmes optionnels). */
@@ -40,18 +41,24 @@ export class QuizService {
     embeds: EmbedBuilder[];
     components: ActionRowBuilder<ButtonBuilder>[];
   } {
+    // Les réponses sont listées dans l'embed (A/B/C/D) ; les boutons ne portent
+    // que la lettre, pour éviter la troncature des libellés (max ~80 caractères).
+    const optionsText = quiz.options
+      .map((option, index) => `**${OPTION_LETTERS[index]}.** ${option}`)
+      .join("\n");
+
     const embed = new EmbedBuilder()
       .setTitle(t(lang, "quiz.title"))
       .setColor(0x5865F2)
-      .setDescription(quiz.question)
+      .setDescription(`${quiz.question}\n\n${optionsText}`)
       .setFooter({ text: t(lang, "quiz.footer") })
       .setTimestamp();
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      quiz.options.map((option, index) =>
+      quiz.options.map((_option, index) =>
         new ButtonBuilder()
           .setCustomId(`quiz_${index}`)
-          .setLabel(option.slice(0, 80))
+          .setLabel(OPTION_LETTERS[index])
           .setStyle(ButtonStyle.Primary)
       )
     );
@@ -62,10 +69,10 @@ export class QuizService {
   /** Boutons désactivés, la bonne réponse mise en vert (fin de quiz). */
   private static disabledComponents(quiz: QuizData): ActionRowBuilder<ButtonBuilder>[] {
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      quiz.options.map((option, index) =>
+      quiz.options.map((_option, index) =>
         new ButtonBuilder()
           .setCustomId(`quiz_${index}`)
-          .setLabel(option.slice(0, 80))
+          .setLabel(OPTION_LETTERS[index])
           .setStyle(index === quiz.correctIndex ? ButtonStyle.Success : ButtonStyle.Secondary)
           .setDisabled(true)
       )
