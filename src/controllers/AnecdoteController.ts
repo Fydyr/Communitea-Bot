@@ -711,6 +711,9 @@ export class AnecdoteController {
 
       const message = await interaction.fetchReply();
       QuizService.attachCollector(message, generated.quiz, generated.lang);
+      if (interaction.guildId) {
+        await QuizService.saveSentQuiz(interaction.guildId, generated.quiz.question);
+      }
     } catch (error) {
       await LoggerService.error(`Erreur /quiz: ${error}`);
       await interaction.editReply(t(lang, "quiz.failed"));

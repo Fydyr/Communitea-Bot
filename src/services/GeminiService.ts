@@ -100,6 +100,18 @@ export class GeminiService {
     return sentAnecdotes.map((a) => a.title);
   }
 
+  /**
+   * Récupère toutes les questions de quiz déjà envoyées pour un serveur spécifique
+   */
+  private static async getSentQuizQuestions(guildId: string): Promise<string[]> {
+    const sentQuizzes = await prisma.sentQuiz.findMany({
+      where: { guildId },
+      select: { question: true },
+      orderBy: { sentAt: "desc" },
+    });
+    return sentQuizzes.map((q) => q.question);
+  }
+
   /** Directive de langue ajoutée aux prompts d'anecdote. */
   private static languageDirective(language: Language): string {
     const languageName = this.LANGUAGE_NAMES[language] ?? this.LANGUAGE_NAMES[DEFAULT_LANGUAGE];
@@ -300,12 +312,17 @@ Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
   /**
    * Génère une question de quiz à choix multiple sur l'informatique/la tech.
    */
-  public static async generateQuiz(language: Language = DEFAULT_LANGUAGE, themesContext = ""): Promise<QuizData | null> {
+  public static async generateQuiz(language: Language = DEFAULT_LANGUAGE, themesContext = "", guildId?: string): Promise<QuizData | null> {
     this.initialize();
     if (!this.genAI) {
       await LoggerService.warning("GEMINI_API_KEY non configurée");
       return null;
     }
+
+    const sentQuestions = guildId ? await this.getSentQuizQuestions(guildId) : [];
+    const questionsContext = sentQuestions.length > 0
+      ? `\n\n⛔ QUESTIONS INTERDITES - Ces questions ont DÉJÀ été posées sur ce serveur. Tu ne dois ABSOLUMENT PAS les répéter, ni les reformuler, ni poser une question portant sur le même fait précis :\n${sentQuestions.map((question) => `- "${question}"`).join("\n")}\n\nChoisis une question COMPLÈTEMENT DIFFÉRENTE de celles listées ci-dessus.`
+      : "";
 
     const prompt = `Crée une question de quiz à choix multiple, intéressante et factuelle, sur l'informatique, la technologie ou l'histoire du numérique.
 
@@ -313,7 +330,7 @@ Critères :
 - La question doit avoir exactement 4 réponses possibles, dont une seule correcte
 - Évite les questions trop évidentes
 - L'explication justifie brièvement la bonne réponse
-${themesContext}
+${themesContext}${questionsContext}
 
 Format de réponse (respecte exactement ce format JSON) :
 {

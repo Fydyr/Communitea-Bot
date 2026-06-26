@@ -30,6 +30,15 @@ model SentAnecdote {
   @@index([guildId])
 }
 
+model SentQuiz {
+  id        String   @id @default(cuid())
+  guildId   String
+  question  String
+  sentAt    DateTime @default(now())
+
+  @@index([guildId])
+}
+
 model GuildSettings {
   id        String   @id @default(cuid())
   guildId   String   @unique

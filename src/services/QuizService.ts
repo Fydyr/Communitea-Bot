@@ -18,22 +18,36 @@ import { LoggerService } from "./LoggerService";
 import { t } from "../i18n";
 
 const COLLECTOR_MS = 60_000;
+/** Durée du collecteur pour les quiz automatiques (programmés) : 5 minutes. */
+const AUTO_COLLECTOR_MS = 5 * 60_000;
 const OPTION_LETTERS = ["A", "B", "C", "D"];
 
 export class QuizService {
   /** Génère un quiz dans une langue donnée (thèmes optionnels). */
-  public static async generate(language: Language, themesContext = ""): Promise<{ quiz: QuizData; lang: Language } | null> {
-    const quiz = await GeminiService.generateQuiz(language, themesContext);
+  public static async generate(language: Language, themesContext = "", guildId?: string): Promise<{ quiz: QuizData; lang: Language } | null> {
+    const quiz = await GeminiService.generateQuiz(language, themesContext, guildId);
     if (!quiz) {
       return null;
     }
     return { quiz, lang: language };
   }
 
-  /** Génère un quiz pour un serveur (langue + thèmes pris en compte). */
+  /** Génère un quiz pour un serveur (langue + thèmes + mémoire pris en compte). */
   public static async generateForGuild(guildId: string): Promise<{ quiz: QuizData; lang: Language } | null> {
     const settings = await GuildSettingsService.get(guildId);
-    return this.generate(settings.language, AnecdoteService.buildThemesContext(settings.themes));
+    return this.generate(settings.language, AnecdoteService.buildThemesContext(settings.themes), guildId);
+  }
+
+  /**
+   * Mémorise la question d'un quiz envoyée sur un serveur, pour éviter de la
+   * répéter lors des prochaines générations (filtré côté Gemini).
+   */
+  public static async saveSentQuiz(guildId: string, question: string): Promise<void> {
+    try {
+      await prisma.sentQuiz.create({ data: { guildId, question: question.trim() } });
+    } catch (error) {
+      await LoggerService.error(`Erreur lors de la sauvegarde du quiz pour le serveur ${guildId}: ${error}`);
+    }
   }
 
   /** Embed + boutons (actifs) pour un quiz. */
@@ -84,10 +98,10 @@ export class QuizService {
    * Attache un collector de boutons : feedback éphémère par utilisateur, puis
    * révélation de la bonne réponse à la fin.
    */
-  public static attachCollector(message: Message, quiz: QuizData, lang: Language): void {
+  public static attachCollector(message: Message, quiz: QuizData, lang: Language, collectorMs: number = COLLECTOR_MS): void {
     const collector = message.createMessageComponentCollector({
       componentType: ComponentType.Button,
-      time: COLLECTOR_MS,
+      time: collectorMs,
     });
 
     collector.on("collect", async (interaction) => {
@@ -136,7 +150,9 @@ export class QuizService {
 
     const { embeds, components } = this.buildMessage(generated.quiz, generated.lang);
     const message = await channel.send({ embeds, components });
-    this.attachCollector(message, generated.quiz, generated.lang);
+    // Quiz automatique : collecteur de 5 minutes et mémorisation par serveur.
+    this.attachCollector(message, generated.quiz, generated.lang, AUTO_COLLECTOR_MS);
+    await this.saveSentQuiz(guildId, generated.quiz.question);
     return true;
   }
 
