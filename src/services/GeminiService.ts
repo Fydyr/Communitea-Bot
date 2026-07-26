@@ -3,6 +3,8 @@ import { LoggerService } from "./LoggerService";
 import { prisma } from "../lib/prisma";
 import { config } from "../config";
 import { DEFAULT_LANGUAGE, type Language } from "./GuildSettingsService";
+import { repairJson } from "./jsonRepair";
+import { shuffleQuizOptions } from "./quizUtils";
 
 export interface QuizData {
   question: string;
@@ -70,22 +72,6 @@ export class GeminiService {
       await LoggerService.error(`Erreur lors de la traduction Gemini: ${error}`);
       return null;
     }
-  }
-
-  /**
-   * Tente de réparer un JSON malformé retourné par Gemini
-   */
-  private static repairJson(json: string): string {
-    let fixed = json;
-    // Supprimer les virgules en trop avant ] ou }
-    fixed = fixed.replace(/,\s*([\]}])/g, "$1");
-    // Supprimer les caractères de contrôle non échappés dans les strings
-    fixed = fixed.replace(/(?<=:\s*"(?:[^"\\]|\\.)*)[\x00-\x1f](?=[^"]*")/g, " ");
-    // Remplacer les sauts de ligne non échappés dans les valeurs string
-    fixed = fixed.replace(/"([^"]*?)"/g, (_match, content: string) => {
-      return `"${content.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")}"`;
-    });
-    return fixed;
   }
 
   /**
@@ -239,7 +225,7 @@ Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
             raw = JSON.parse(jsonMatch[0]);
           } catch {
             try {
-              raw = JSON.parse(this.repairJson(jsonMatch[0]));
+              raw = JSON.parse(repairJson(jsonMatch[0]));
               await LoggerService.info(`JSON réparé avec succès [${modelName}] tentative ${attempt}`);
             } catch {
               await LoggerService.warning(`Gemini [${modelName}] tentative ${attempt}: JSON malformé impossible à réparer`);
@@ -363,19 +349,13 @@ Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
       return null;
     }
 
-    // Gemini place presque toujours la bonne réponse en A ou B : on mélange les
-    // options (Fisher-Yates) pour répartir la bonne réponse sur les 4 positions.
-    const options = raw.options.map((o: string) => o.trim());
-    const correctAnswer = options[Math.floor(raw.correctIndex)];
-    for (let i = options.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [options[i], options[j]] = [options[j], options[i]];
-    }
+    const trimmed = raw.options.map((o: string) => o.trim());
+    const shuffled = shuffleQuizOptions(trimmed, Math.floor(raw.correctIndex));
 
     return {
       question: raw.question.trim(),
-      options,
-      correctIndex: options.indexOf(correctAnswer),
+      options: shuffled.options,
+      correctIndex: shuffled.correctIndex,
       explanation: raw.explanation.trim(),
     };
   }
@@ -411,7 +391,7 @@ Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
             return JSON.parse(jsonMatch[0]);
           } catch {
             try {
-              return JSON.parse(this.repairJson(jsonMatch[0]));
+              return JSON.parse(repairJson(jsonMatch[0]));
             } catch {
               continue;
             }

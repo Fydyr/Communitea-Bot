@@ -443,11 +443,20 @@ https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=10
 
 ### 🧪 Testing
 
-Actuellement, aucun test automatisé n'est configuré. Pour tester le bot :
+Le projet utilise [Vitest](https://vitest.dev/) avec deux niveaux de tests :
 
-1. Lancez le bot en mode développement
-2. Utilisez les commandes slash dans votre serveur Discord de test
-3. Vérifiez les logs dans la console et le channel de logs configuré
+- **Tests unitaires** — logique pure sans I/O (calcul XP/niveaux, réparation JSON, mélange des réponses de quiz, helpers de fuseau horaire) et tests de contrôleurs avec interactions Discord mockées.
+- **Tests d'intégration** — services Prisma exécutés contre un PostgreSQL jetable démarré via [Testcontainers](https://testcontainers.com/) (Docker requis), Discord et Gemini étant mockés.
+
+```bash
+npm run test:unit          # tests unitaires (rapides, sans Docker)
+npm run test:integration   # tests d'intégration (Docker requis)
+npm test                   # toute la suite
+npm run test:watch         # mode watch
+npm run test:coverage      # rapport de couverture
+```
+
+Les tests s'exécutent aussi automatiquement en CI (GitHub Actions) sur chaque push et pull request.
 
 
 ---
@@ -467,10 +476,10 @@ Actuellement, aucun test automatisé n'est configuré. Pour tester le bot :
 - [X] Commandes de configuration dynamiques (horaires, fuseau, langue, thèmes, salons)
 - [X] Statistiques et progression (XP, niveaux)
 - [X] Classement XP et quiz par serveur (`/leaderboard`, `/quiz-leaderboard`)
+- [X] Tests unitaires et d'intégration (Vitest + Testcontainers) avec CI GitHub Actions
 
 ### Améliorations futures
 
-- [ ] Tests unitaires et d'intégration
 - [ ] Système de rôles et permissions personnalisables
 - [ ] Commandes de divertissement (jeux, musique)
 - [ ] Tableau de bord web de configuration

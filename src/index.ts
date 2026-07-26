@@ -107,4 +107,8 @@ process.on("SIGTERM", async () => {
   process.exit(0);
 });
 
-run(); 
+// Ne démarre le bot que lorsque ce fichier est exécuté directement
+// (node dist/index.js) et non lorsqu'il est importé (ex. par les tests).
+if (require.main === module) {
+  run();
+}
