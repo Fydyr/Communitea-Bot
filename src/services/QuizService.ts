@@ -51,7 +51,7 @@ export class QuizService {
   }
 
   /** Embed + boutons (actifs) pour un quiz. */
-  public static buildMessage(quiz: QuizData, lang: Language): {
+  public static buildMessage(quiz: QuizData, lang: Language, collectorMs: number = COLLECTOR_MS): {
     embeds: EmbedBuilder[];
     components: ActionRowBuilder<ButtonBuilder>[];
   } {
@@ -61,11 +61,12 @@ export class QuizService {
       .map((option, index) => `**${OPTION_LETTERS[index]}.** ${option}`)
       .join("\n");
 
+    const minutes = Math.round(collectorMs / 60_000);
     const embed = new EmbedBuilder()
       .setTitle(t(lang, "quiz.title"))
       .setColor(0x5865F2)
       .setDescription(`${quiz.question}\n\n${optionsText}`)
-      .setFooter({ text: t(lang, "quiz.footer") })
+      .setFooter({ text: t(lang, "quiz.footer", { minutes }) })
       .setTimestamp();
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -148,9 +149,9 @@ export class QuizService {
       return false;
     }
 
-    const { embeds, components } = this.buildMessage(generated.quiz, generated.lang);
+    // Quiz automatique : footer + collecteur de 5 minutes et mémorisation par serveur.
+    const { embeds, components } = this.buildMessage(generated.quiz, generated.lang, AUTO_COLLECTOR_MS);
     const message = await channel.send({ embeds, components });
-    // Quiz automatique : collecteur de 5 minutes et mémorisation par serveur.
     this.attachCollector(message, generated.quiz, generated.lang, AUTO_COLLECTOR_MS);
     await this.saveSentQuiz(guildId, generated.quiz.question);
     return true;

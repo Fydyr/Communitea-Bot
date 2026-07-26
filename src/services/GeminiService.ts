@@ -363,10 +363,19 @@ Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
       return null;
     }
 
+    // Gemini place presque toujours la bonne réponse en A ou B : on mélange les
+    // options (Fisher-Yates) pour répartir la bonne réponse sur les 4 positions.
+    const options = raw.options.map((o: string) => o.trim());
+    const correctAnswer = options[Math.floor(raw.correctIndex)];
+    for (let i = options.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [options[i], options[j]] = [options[j], options[i]];
+    }
+
     return {
       question: raw.question.trim(),
-      options: raw.options.map((o: string) => o.trim()),
-      correctIndex: Math.floor(raw.correctIndex),
+      options,
+      correctIndex: options.indexOf(correctAnswer),
       explanation: raw.explanation.trim(),
     };
   }

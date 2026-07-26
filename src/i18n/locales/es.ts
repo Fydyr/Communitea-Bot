@@ -73,7 +73,7 @@ export const es: Record<MessageKey, string> = {
   "schedule.quizHours": "🧠 Cuestionarios programados",
 
   "quiz.title": "🧠 Cuestionario",
-  "quiz.footer": "Tienes 1 minuto para responder",
+  "quiz.footer": "Tienes {minutes} min para responder",
   "quiz.correct": "✅ ¡Correcto! {explanation}",
   "quiz.incorrect": "❌ Respuesta incorrecta. La respuesta correcta era: **{answer}**.\n{explanation}",
   "quiz.reveal": "✅ Respuesta: **{answer}**",
