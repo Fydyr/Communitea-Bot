@@ -460,16 +460,20 @@ Actuellement, aucun test automatisé n'est configuré. Pour tester le bot :
 - [X] Actions automatiques basées sur le nombre d'avertissements
 - [X] Déploiement Docker
 - [X] Nettoyage automatique des infractions expirées
+- [X] Support multi-langues pour les anecdotes et messages du bot
+- [X] Système de quiz interactif (manuel et programmé) avec mémoire par serveur
+- [X] Base de données persistante (PostgreSQL via Prisma)
+- [X] Support multi-serveurs (paramètres par serveur)
+- [X] Commandes de configuration dynamiques (horaires, fuseau, langue, thèmes, salons)
+- [X] Statistiques et progression (XP, niveaux)
+- [X] Classement XP et quiz par serveur (`/leaderboard`, `/quiz-leaderboard`)
 
 ### Améliorations futures
 
-- [ ] Base de données persistante (PostgreSQL/MongoDB)
-- [ ] Commandes de configuration dynamiques
-- [ ] Statistiques et analytics
 - [ ] Tests unitaires et d'intégration
 - [ ] Système de rôles et permissions personnalisables
-- [ ] Support multi-serveurs
 - [ ] Commandes de divertissement (jeux, musique)
+- [ ] Tableau de bord web de configuration
 
 ---
 
