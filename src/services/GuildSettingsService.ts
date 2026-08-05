@@ -36,6 +36,7 @@ export interface GuildSettingsValues {
   language: Language;
   themes: Theme[];
   quizHours: number[];
+  newsHours: number[];
   /** true si aucune ligne en base : ce sont les valeurs par défaut. */
   isDefault: boolean;
 }
@@ -58,8 +59,8 @@ export type RemoveThemeResult =
   | { status: "removed"; themes: Theme[] }
   | { status: "not-present" };
 
-/** Champ de type Int[] manipulable via add/remove (heures d'envoi ou de quiz). */
-type IntListField = "hours" | "quizHours";
+/** Champ de type Int[] manipulable via add/remove (heures d'envoi, de quiz ou de news). */
+type IntListField = "hours" | "quizHours" | "newsHours";
 
 function isLanguage(value: string): value is Language {
   return (SUPPORTED_LANGUAGES as readonly string[]).includes(value);
@@ -115,6 +116,7 @@ export class GuildSettingsService {
         language: DEFAULT_LANGUAGE,
         themes: [],
         quizHours: [],
+        newsHours: [],
         isDefault: true,
       };
     }
@@ -125,6 +127,7 @@ export class GuildSettingsService {
       language: normalizeLanguage(row.language),
       themes: normalizeThemes(row.themes),
       quizHours: sortHours(row.quizHours),
+      newsHours: sortHours(row.newsHours),
       isDefault: false,
     };
   }
@@ -206,6 +209,16 @@ export class GuildSettingsService {
   /** Retire une heure d'envoi de quiz. */
   static removeQuizHour(guildId: string, hour: number): Promise<RemoveHourResult> {
     return this.removeFromIntList(guildId, "quizHours", hour);
+  }
+
+  /** Ajoute une heure d'envoi de news (0-23). */
+  static addNewsHour(guildId: string, hour: number): Promise<AddHourResult> {
+    return this.addToIntList(guildId, "newsHours", hour);
+  }
+
+  /** Retire une heure d'envoi de news. */
+  static removeNewsHour(guildId: string, hour: number): Promise<RemoveHourResult> {
+    return this.removeFromIntList(guildId, "newsHours", hour);
   }
 
   static isValidTheme(value: string): value is Theme {

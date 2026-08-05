@@ -103,6 +103,33 @@ export const fr = {
 
   "recap.title": "🏆 Anecdote de la semaine",
   "recap.description": "L'anecdote la plus appréciée des 7 derniers jours ({up} 👍 / {down} 👎) :\n\n**{title}**\n[Voir le message]({url})",
+
+  "newsSetup.created": "✅ Les news seront envoyées dans <#{channel}>{roleSuffix}.",
+  "newsSetup.updated": "✅ Configuration des news mise à jour pour <#{channel}>{roleSuffix}.",
+  "newsSetup.error": "❌ Une erreur est survenue lors de la configuration des news.",
+
+  "newsRemove.success": "✅ Le channel <#{channel}> ne recevra plus de news.",
+  "newsRemove.notConfigured": "⚠️ Le channel <#{channel}> n'était pas configuré pour les news.",
+
+  "newsList.empty": "📭 Aucun channel n'est configuré pour les news sur ce serveur.\nUtilise `/news-setup` pour en configurer un.",
+  "newsList.title": "📰 Channels de news configurés",
+  "newsList.footer": "{count} channel(s) configuré(s)",
+
+  "newsHour.added": "✅ Heure de news {hour}h ajoutée. News programmées : {hours}.",
+  "newsHour.exists": "⚠️ L'heure de news {hour}h est déjà configurée.",
+  "newsHour.notPresent": "⚠️ L'heure de news {hour}h n'est pas configurée.",
+  "newsHour.removed": "✅ Heure de news {hour}h retirée. News programmées : {hours}.",
+  "newsHour.emptied": "✅ Heure de news {hour}h retirée. Plus aucune news programmée.",
+
+  "news.title": "📰 Actu tech du {date}",
+  "news.footer": "Sources : {sources}",
+  "news.degraded": "⚠️ Résumés automatiques indisponibles : seuls les titres et les liens sont affichés.",
+  "news.unverified": "⚠️ Contenu généré sans recherche web : vérifie les sources avant de le relayer.",
+  "news.failed": "❌ Impossible de récupérer les news. Réessaie plus tard.",
+  "news.noChannel": "❌ Aucun channel n'est configuré pour les news sur ce serveur.\nUtilise `/news-setup` pour en configurer un.",
+  "news.success": "✅ News envoyées dans : {channels}",
+
+  "schedule.newsHours": "📰 News programmées",
 } as const;
 
 export type MessageKey = keyof typeof fr;

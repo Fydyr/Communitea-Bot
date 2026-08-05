@@ -105,4 +105,31 @@ export const es: Record<MessageKey, string> = {
 
   "recap.title": "🏆 Anécdota de la semana",
   "recap.description": "La anécdota más apreciada de los últimos 7 días ({up} 👍 / {down} 👎):\n\n**{title}**\n[Ver el mensaje]({url})",
+
+  "newsSetup.created": "✅ Las noticias se enviarán a <#{channel}>{roleSuffix}.",
+  "newsSetup.updated": "✅ Configuración de noticias actualizada para <#{channel}>{roleSuffix}.",
+  "newsSetup.error": "❌ Se produjo un error al configurar las noticias.",
+
+  "newsRemove.success": "✅ El canal <#{channel}> ya no recibirá noticias.",
+  "newsRemove.notConfigured": "⚠️ El canal <#{channel}> no estaba configurado para noticias.",
+
+  "newsList.empty": "📭 Ningún canal está configurado para noticias en este servidor.\nUsa `/news-setup` para configurar uno.",
+  "newsList.title": "📰 Canales de noticias configurados",
+  "newsList.footer": "{count} canal(es) configurado(s)",
+
+  "newsHour.added": "✅ Hora de noticias {hour}:00 añadida. Noticias programadas: {hours}.",
+  "newsHour.exists": "⚠️ La hora de noticias {hour}:00 ya está configurada.",
+  "newsHour.notPresent": "⚠️ La hora de noticias {hour}:00 no está configurada.",
+  "newsHour.removed": "✅ Hora de noticias {hour}:00 eliminada. Noticias programadas: {hours}.",
+  "newsHour.emptied": "✅ Hora de noticias {hour}:00 eliminada. Ya no hay noticias programadas.",
+
+  "news.title": "📰 Actualidad tecnológica — {date}",
+  "news.footer": "Fuentes: {sources}",
+  "news.degraded": "⚠️ Resúmenes automáticos no disponibles: solo se muestran títulos y enlaces.",
+  "news.unverified": "⚠️ Generado sin búsqueda web: verifica las fuentes antes de compartir.",
+  "news.failed": "❌ No se pudieron obtener las noticias. Inténtalo más tarde.",
+  "news.noChannel": "❌ Ningún canal está configurado para noticias en este servidor.\nUsa `/news-setup` para configurar uno.",
+  "news.success": "✅ Noticias enviadas a: {channels}",
+
+  "schedule.newsHours": "📰 Noticias programadas",
 };

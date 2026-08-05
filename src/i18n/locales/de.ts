@@ -105,4 +105,31 @@ export const de: Record<MessageKey, string> = {
 
   "recap.title": "🏆 Anekdote der Woche",
   "recap.description": "Die beliebteste Anekdote der letzten 7 Tage ({up} 👍 / {down} 👎):\n\n**{title}**\n[Nachricht ansehen]({url})",
+
+  "newsSetup.created": "✅ News werden in <#{channel}>{roleSuffix} gesendet.",
+  "newsSetup.updated": "✅ News-Konfiguration für <#{channel}>{roleSuffix} aktualisiert.",
+  "newsSetup.error": "❌ Bei der News-Konfiguration ist ein Fehler aufgetreten.",
+
+  "newsRemove.success": "✅ Der Kanal <#{channel}> erhält keine News mehr.",
+  "newsRemove.notConfigured": "⚠️ Der Kanal <#{channel}> war nicht für News konfiguriert.",
+
+  "newsList.empty": "📭 Auf diesem Server ist kein Kanal für News konfiguriert.\nNutze `/news-setup`, um einen einzurichten.",
+  "newsList.title": "📰 Konfigurierte News-Kanäle",
+  "newsList.footer": "{count} Kanal/Kanäle konfiguriert",
+
+  "newsHour.added": "✅ News-Uhrzeit {hour}:00 hinzugefügt. Geplante News: {hours}.",
+  "newsHour.exists": "⚠️ Die News-Uhrzeit {hour}:00 ist bereits konfiguriert.",
+  "newsHour.notPresent": "⚠️ Die News-Uhrzeit {hour}:00 ist nicht konfiguriert.",
+  "newsHour.removed": "✅ News-Uhrzeit {hour}:00 entfernt. Geplante News: {hours}.",
+  "newsHour.emptied": "✅ News-Uhrzeit {hour}:00 entfernt. Es sind keine News mehr geplant.",
+
+  "news.title": "📰 Tech-News vom {date}",
+  "news.footer": "Quellen: {sources}",
+  "news.degraded": "⚠️ Automatische Zusammenfassungen nicht verfügbar: nur Titel und Links werden angezeigt.",
+  "news.unverified": "⚠️ Ohne Websuche erzeugt: Quellen vor dem Teilen prüfen.",
+  "news.failed": "❌ Die News konnten nicht abgerufen werden. Versuche es später erneut.",
+  "news.noChannel": "❌ Auf diesem Server ist kein Kanal für News konfiguriert.\nNutze `/news-setup`, um einen einzurichten.",
+  "news.success": "✅ News gesendet an: {channels}",
+
+  "schedule.newsHours": "📰 Geplante News",
 };

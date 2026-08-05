@@ -1,10 +1,12 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import axios from "axios";
 import { LoggerService } from "./LoggerService";
 import { prisma } from "../lib/prisma";
 import { config } from "../config";
 import { DEFAULT_LANGUAGE, type Language } from "./GuildSettingsService";
 import { repairJson } from "./jsonRepair";
 import { shuffleQuizOptions } from "./quizUtils";
+import { MIN_ITEMS, MAX_ITEMS, type NewsItem } from "./newsTypes";
 
 export interface QuizData {
   question: string;
@@ -412,5 +414,238 @@ Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
     }
 
     return null;
+  }
+
+  /** Vérifie qu'une URL est exploitable dans un embed Discord. */
+  private static isHttpUrl(value: unknown): value is string {
+    if (typeof value !== "string") return false;
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
+
+  /** Valide et normalise une liste d'articles renvoyée par Gemini. */
+  private static normalizeNewsItems(raw: unknown): NewsItem[] {
+    if (!Array.isArray(raw)) return [];
+
+    const items: NewsItem[] = [];
+
+    for (const entry of raw) {
+      if (!entry || typeof entry !== "object") continue;
+      const candidate = entry as Record<string, unknown>;
+
+      if (typeof candidate.title !== "string" || candidate.title.trim().length === 0) continue;
+      if (!this.isHttpUrl(candidate.url)) continue;
+
+      items.push({
+        title: candidate.title.trim(),
+        url: candidate.url,
+        summary: typeof candidate.summary === "string" ? candidate.summary.trim() : "",
+        source: typeof candidate.source === "string" && candidate.source.trim().length > 0
+          ? candidate.source.trim()
+          : new URL(candidate.url).hostname.replace(/^www\./, ""),
+      });
+
+      if (items.length >= MAX_ITEMS) break;
+    }
+
+    return items;
+  }
+
+  /**
+   * Rédige un résumé d'une à deux phrases par article, dans la langue du
+   * serveur. Renvoie null si Gemini échoue ou si le nombre de résumés ne
+   * correspond pas au nombre d'articles : l'appelant bascule alors en mode
+   * dégradé (titres bruts).
+   */
+  public static async summarizeNewsItems(
+    items: { title: string; description: string; source: string }[],
+    language: Language = DEFAULT_LANGUAGE
+  ): Promise<string[] | null> {
+    this.initialize();
+    if (!this.genAI || items.length === 0) {
+      return null;
+    }
+
+    const languageName = this.LANGUAGE_NAMES[language] ?? this.LANGUAGE_NAMES[DEFAULT_LANGUAGE];
+    const list = items
+      .map((item, index) => `${index + 1}. [${item.source}] ${item.title}\n${item.description}`)
+      .join("\n\n");
+
+    const prompt = `Voici ${items.length} articles d'actualité tech. Pour chacun, rédige un résumé d'une à deux phrases, factuel et sans superlatif.
+
+${list}
+
+Format de réponse (respecte exactement ce format JSON) :
+{
+  "summaries": ["Résumé de l'article 1", "Résumé de l'article 2"]
+}
+
+Le tableau doit contenir exactement ${items.length} résumés, dans le même ordre que les articles.
+
+LANGUE OBLIGATOIRE : rédige tous les résumés en ${languageName}, quelle que soit la langue de l'article d'origine.
+
+Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
+
+    const raw = await this.runJsonPrompt(prompt);
+
+    if (!raw || !Array.isArray(raw.summaries) || raw.summaries.length !== items.length) {
+      await LoggerService.warning("Gemini news: résumés absents ou en nombre incorrect");
+      return null;
+    }
+
+    if (!raw.summaries.every((s: unknown) => typeof s === "string" && s.trim().length > 0)) {
+      await LoggerService.warning("Gemini news: un résumé est vide");
+      return null;
+    }
+
+    return raw.summaries.map((s: string) => s.trim());
+  }
+
+  /**
+   * Niveau 2 de la cascade : demande à Gemini les actualités des dernières 24 h
+   * en activant la recherche Google.
+   *
+   * Le SDK installé n'expose que `googleSearchRetrieval`, incompatible avec les
+   * modèles Gemini 2.x : on passe donc par l'API REST. Le grounding interdit
+   * aussi `responseMimeType: "application/json"`, d'où le parsing tolérant.
+   */
+  public static async searchNews(
+    themesContext = "",
+    language: Language = DEFAULT_LANGUAGE
+  ): Promise<NewsItem[] | null> {
+    if (!config.geminiApiKey) {
+      await LoggerService.warning("GEMINI_API_KEY non configurée");
+      return null;
+    }
+
+    const languageName = this.LANGUAGE_NAMES[language] ?? this.LANGUAGE_NAMES[DEFAULT_LANGUAGE];
+    const prompt = `Recherche les actualités les plus marquantes des dernières 24 heures dans l'informatique et la technologie.
+
+Critères :
+- Uniquement des faits réellement publiés au cours des dernières 24 heures
+- Entre ${MIN_ITEMS} et ${MAX_ITEMS} actualités distinctes
+- Chaque actualité doit renvoyer vers l'URL réelle de l'article d'origine
+${themesContext}
+
+Format de réponse (respecte exactement ce format JSON) :
+{
+  "items": [
+    {
+      "title": "Titre de l'actualité",
+      "url": "URL complète de l'article source",
+      "summary": "Résumé d'une à deux phrases",
+      "source": "Nom du média"
+    }
+  ]
+}
+
+LANGUE OBLIGATOIRE : rédige les titres et les résumés en ${languageName}.
+
+Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
+
+    for (const modelName of this.MODEL_NAMES) {
+      try {
+        const response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${config.geminiApiKey}`,
+          {
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            tools: [{ google_search: {} }],
+          },
+          // 20 s suffisent largement pour cet appel. Un timeout plus long
+          // multiplié par la cascade de modèles rendait le pire cas (5 × 60 s)
+          // plus long que la cadence du planificateur de news.
+          { timeout: 20_000, headers: { "Content-Type": "application/json" } }
+        );
+
+        const parts = response.data?.candidates?.[0]?.content?.parts ?? [];
+        const text = parts.map((part: { text?: string }) => part.text ?? "").join("");
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          await LoggerService.warning(`Gemini search [${modelName}] : pas de JSON dans la réponse`);
+          continue;
+        }
+
+        let raw: any;
+        try {
+          raw = JSON.parse(jsonMatch[0]);
+        } catch {
+          try {
+            raw = JSON.parse(repairJson(jsonMatch[0]));
+          } catch {
+            await LoggerService.warning(`Gemini search [${modelName}] : JSON irréparable`);
+            continue;
+          }
+        }
+
+        const items = this.normalizeNewsItems(raw?.items);
+        if (items.length >= MIN_ITEMS) {
+          return items;
+        }
+
+        await LoggerService.warning(`Gemini search [${modelName}] : moins de ${MIN_ITEMS} articles exploitables`);
+      } catch (error) {
+        const errStr = String(error);
+        // Même classification que `runJsonPrompt` : une surcharge ou un quota
+        // est propre au modèle appelé, essayer le suivant a du sens. Toute
+        // autre erreur (clé invalide, réseau coupé, timeout) frappera les
+        // modèles suivants à l'identique : insister ne ferait qu'allonger le
+        // pire cas de la cascade sans aucune chance de succès.
+        const isOverloaded = /\b(503|429|overload|unavailable|quota|rate.?limit)/i.test(errStr);
+        await LoggerService.warning(
+          `Gemini search [${modelName}] échec: ${errStr.substring(0, 200)}`
+        );
+
+        if (!isOverloaded) {
+          break;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Niveau 3 de la cascade : digest produit sans recherche web. Le contenu peut
+   * être daté ; l'appelant l'annonce comme non vérifié.
+   */
+  public static async generateNewsDigest(
+    themesContext = "",
+    language: Language = DEFAULT_LANGUAGE
+  ): Promise<NewsItem[] | null> {
+    this.initialize();
+    if (!this.genAI) {
+      await LoggerService.warning("GEMINI_API_KEY non configurée");
+      return null;
+    }
+
+    const languageName = this.LANGUAGE_NAMES[language] ?? this.LANGUAGE_NAMES[DEFAULT_LANGUAGE];
+    const prompt = `Propose ${MIN_ITEMS} à ${MAX_ITEMS} sujets d'actualité tech marquants et récents, avec pour chacun une source vérifiable.
+${themesContext}
+
+Format de réponse (respecte exactement ce format JSON) :
+{
+  "items": [
+    {
+      "title": "Titre du sujet",
+      "url": "URL complète d'une source vérifiable",
+      "summary": "Résumé d'une à deux phrases",
+      "source": "Nom du média"
+    }
+  ]
+}
+
+LANGUE OBLIGATOIRE : rédige les titres et les résumés en ${languageName}.
+
+Réponds UNIQUEMENT avec le JSON, sans texte avant ou après.`;
+
+    const raw = await this.runJsonPrompt(prompt);
+    const items = this.normalizeNewsItems(raw?.items);
+
+    return items.length >= MIN_ITEMS ? items : null;
   }
 }

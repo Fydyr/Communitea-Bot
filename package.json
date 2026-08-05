@@ -38,6 +38,7 @@
     "discord.js": "^14.25.0",
     "discordx": "^11.13.2",
     "dotenv": "^16.4.5",
+    "fast-xml-parser": "^5.10.1",
     "glob": "^10.3.10",
     "node-cron": "^4.2.1",
     "prisma": "^5.22.0",

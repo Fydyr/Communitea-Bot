@@ -13,6 +13,9 @@ const TABLES = [
   "UserStats",
   "XpEvent",
   "SentQuiz",
+  "NewsChannel",
+  "SentNews",
+  "NewsRun",
 ];
 
 declare global {

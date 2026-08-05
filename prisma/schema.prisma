@@ -47,6 +47,7 @@ model GuildSettings {
   language  String   @default("fr")
   themes    String[] @default([])
   quizHours Int[]    @default([])
+  newsHours Int[]    @default([])
   updatedAt DateTime @updatedAt
 }
 
@@ -99,4 +100,42 @@ model XpEvent {
   createdAt DateTime @default(now())
 
   @@unique([userId, source, refId])
+}
+
+model NewsChannel {
+  id        String   @id @default(cuid())
+  guildId   String
+  channelId String
+  roleId    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, channelId])
+  @@index([guildId])
+}
+
+model SentNews {
+  id      String   @id @default(cuid())
+  guildId String
+  url     String
+  title   String
+  sentAt  DateTime @default(now())
+
+  @@index([guildId, sentAt])
+}
+
+model NewsRun {
+  id            String    @id @default(cuid())
+  guildId       String
+  runDate       String
+  slotHour      Int
+  status        String    @default("pending")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime?
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([guildId, runDate, slotHour])
+  @@index([status, nextAttemptAt])
 }

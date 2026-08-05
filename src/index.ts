@@ -7,6 +7,7 @@ import { globSync } from "glob";
 import cron from "node-cron";
 import { AnecdoteService } from "./services/AnecdoteService";
 import { QuizService } from "./services/QuizService";
+import { NewsService } from "./services/NewsService";
 import { LoggerService } from "./services/LoggerService";
 import { registerReactionListeners } from "./listeners/reactions";
 
@@ -40,6 +41,18 @@ bot.once("clientReady", async () => {
   }, { timezone: "UTC" });
 
   await LoggerService.info("📅 Planificateur d'anecdotes et de quiz activé (horaires et fuseaux configurables par serveur)");
+
+  // Cron dédié aux news : toutes les demi-heures, pour supporter le retry à
+  // 30 minutes sans toucher au rythme horaire des anecdotes et des quiz.
+  // `noOverlap: true` : si un tick dépasse 30 minutes (plausible quand le
+  // nombre de serveurs grandit, les envois étant séquentiels), node-cron
+  // n'en démarre pas un second par-dessus — deux ticks concurrents sur le
+  // même créneau "pending" l'enverraient tous les deux.
+  cron.schedule("*/30 * * * *", async () => {
+    await NewsService.tick();
+  }, { timezone: "UTC", noOverlap: true });
+
+  await LoggerService.info("Planificateur de news activé (toutes les 30 minutes, horaires configurables par serveur)");
 });
 
 bot.on("interactionCreate", async (interaction) => {

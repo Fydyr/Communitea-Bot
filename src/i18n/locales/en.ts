@@ -105,4 +105,31 @@ export const en: Record<MessageKey, string> = {
 
   "recap.title": "🏆 Anecdote of the week",
   "recap.description": "The most appreciated anecdote of the last 7 days ({up} 👍 / {down} 👎):\n\n**{title}**\n[View the message]({url})",
+
+  "newsSetup.created": "✅ News will be sent to <#{channel}>{roleSuffix}.",
+  "newsSetup.updated": "✅ News configuration updated for <#{channel}>{roleSuffix}.",
+  "newsSetup.error": "❌ An error occurred while configuring news.",
+
+  "newsRemove.success": "✅ Channel <#{channel}> will no longer receive news.",
+  "newsRemove.notConfigured": "⚠️ Channel <#{channel}> was not configured for news.",
+
+  "newsList.empty": "📭 No channel is configured for news on this server.\nUse `/news-setup` to set one up.",
+  "newsList.title": "📰 Configured news channels",
+  "newsList.footer": "{count} channel(s) configured",
+
+  "newsHour.added": "✅ News hour {hour}:00 added. Scheduled news: {hours}.",
+  "newsHour.exists": "⚠️ News hour {hour}:00 is already configured.",
+  "newsHour.notPresent": "⚠️ News hour {hour}:00 is not configured.",
+  "newsHour.removed": "✅ News hour {hour}:00 removed. Scheduled news: {hours}.",
+  "newsHour.emptied": "✅ News hour {hour}:00 removed. No news scheduled anymore.",
+
+  "news.title": "📰 Tech news — {date}",
+  "news.footer": "Sources: {sources}",
+  "news.degraded": "⚠️ Automatic summaries unavailable: only titles and links are shown.",
+  "news.unverified": "⚠️ Generated without a web search: check the sources before sharing.",
+  "news.failed": "❌ Could not fetch the news. Try again later.",
+  "news.noChannel": "❌ No channel is configured for news on this server.\nUse `/news-setup` to set one up.",
+  "news.success": "✅ News sent to: {channels}",
+
+  "schedule.newsHours": "📰 Scheduled news",
 };

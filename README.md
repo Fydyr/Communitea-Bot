@@ -42,7 +42,7 @@
 
 ## 📍 Overview
 
-Communitea-Bot est un bot Discord moderne et complet, développé en TypeScript avec Discord.js v14. Il offre deux fonctionnalités principales :
+Communitea-Bot est un bot Discord moderne et complet, développé en TypeScript avec Discord.js v14. Il offre quatre fonctionnalités principales :
 
 **🛡️ Système de Modération Complet**
 - Gestion avancée des infractions (avertissements, expulsions, bannissements, timeouts)
@@ -56,6 +56,16 @@ Communitea-Bot est un bot Discord moderne et complet, développé en TypeScript 
 - Génération intelligente via l'API Gemini de Google
 - Fallback sur Wikipedia en cas d'indisponibilité
 - Sujets variés : langages, entreprises tech, personnalités, innovations, histoire de l'informatique
+
+**🧠 Quiz Interactifs et Progression**
+- Quiz manuels (`/quiz`) ou programmés aux heures choisies par le serveur
+- Questions générées via l'API Gemini, avec mémoire des questions déjà posées
+- Système d'XP et de niveaux, classements serveur (`/leaderboard`, `/quiz-leaderboard`)
+
+**📰 News Tech Quotidiennes**
+- Digest d'actualités envoyé aux heures configurées par le serveur (`/news-setup`, `/newshour-add`)
+- Sourcing en cascade : flux RSS, puis recherche web Gemini, puis génération Gemini
+- Résumés dans la langue du serveur, thèmes personnalisables et anti-doublon sur 7 jours
 
 ---
 
@@ -103,6 +113,38 @@ Par défaut (sans configuration) : envoi à 8h00 et 20h00, fuseau Europe/Paris, 
 - Génération par IA (Gemini) avec sources vérifiables, dans la langue du serveur
 - Fallback Wikipedia dans la langue configurée
 - Plus de 60 sujets tech différents couverts par langue
+
+### 📰 News quotidiennes
+
+Configuration des channels (Admin) :
+| Commande | Description |
+|---|---|
+| `/news-setup <salon> [role]` | Configure le salon qui recevra les news quotidiennes |
+| `/news-remove <salon>` | Retire un salon de la configuration des news |
+| `/news-list` | Liste les salons de news configurés |
+
+Planification par serveur (Admin) :
+| Commande | Description |
+|---|---|
+| `/newshour-add <heure>` | Ajoute une heure d'envoi des news (0-23) |
+| `/newshour-remove <heure>` | Retire une heure d'envoi des news |
+
+Envoi manuel (Admin) :
+| Commande | Description |
+|---|---|
+| `/news` | Envoie immédiatement le digest de news |
+
+À chaque heure configurée via `/newshour-add`, le bot publie un digest de 3 à 5
+actualités tech dans les salons déclarés par `/news-setup`, en respectant les
+thèmes (`/theme-add`), la langue et le fuseau horaire du serveur.
+
+Les articles proviennent en priorité de flux RSS ; si aucun flux n'est
+exploitable, le bot interroge Gemini avec la recherche Google, puis, en dernier
+recours, Gemini seul — l'embed indique alors que le contenu n'est pas vérifié.
+
+Si les trois sources échouent, l'envoi est retenté 30 minutes plus tard, jusqu'à
+trois tentatives par créneau. Une même URL n'est jamais républiée deux fois sur
+un serveur dans un intervalle de sept jours.
 
 ### 🔧 Utilitaires
 

@@ -485,7 +485,8 @@ export class AnecdoteController {
           { name: t(lang, "schedule.timezone"), value: `\`${settings.timezone}\``, inline: true },
           { name: t(lang, "schedule.language"), value: LANGUAGE_LABELS[settings.language], inline: true },
           { name: t(lang, "schedule.themes"), value: formatThemes(settings.themes, settings.language), inline: true },
-          { name: t(lang, "schedule.quizHours"), value: formatHours(settings.quizHours, settings.language, "-"), inline: true }
+          { name: t(lang, "schedule.quizHours"), value: formatHours(settings.quizHours, settings.language, "-"), inline: true },
+          { name: t(lang, "schedule.newsHours"), value: formatHours(settings.newsHours, settings.language, "-"), inline: true }
         )
         .setTimestamp();
 
